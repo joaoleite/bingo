@@ -42,6 +42,16 @@
             return number.toString().padStart(2, '0');
         }
         
+        // Função para determinar a letra do BINGO
+        function getBingoLetter(number) {
+            if (number >= 1 && number <= 15) return 'B';
+            if (number >= 16 && number <= 30) return 'I';
+            if (number >= 31 && number <= 45) return 'N';
+            if (number >= 46 && number <= 60) return 'G';
+            if (number >= 61 && number <= 75) return 'O';
+            return '';
+        }
+        
         const currentDisplay = document.getElementById('currentDisplay');
         const allNumbersDisplay = document.getElementById('allNumbersDisplay');
         const allNumbersGrid = document.getElementById('allNumbersGrid');
@@ -57,6 +67,7 @@
         
         // Socket events
         socket.on('gameState', (state) => {
+            console.log('Estado recebido:', state);
             if (state.isShowingAll && state.drawnNumbers.length > 0) {
                 showAllNumbers(state.drawnNumbers);
             } else if (state.currentNumber) {
@@ -67,7 +78,8 @@
             updateRecentNumbers(state.drawnNumbers);
         });
         
-                socket.on('numberDrawn', (data) => {
+        socket.on('numberDrawn', (data) => {
+            console.log('Número sorteado recebido:', data);
             showCurrentNumber(data.number);
             updateRecentNumbers(data.drawnNumbers);
         });
