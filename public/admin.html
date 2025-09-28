@@ -18,6 +18,7 @@
             </div>
             
             <div class="action-buttons">
+                <button id="showLastBtn" class="btn btn-primary">Mostrar Último Sorteio</button>
                 <button id="showAllBtn" class="btn btn-secondary">Mostrar Todos os Números</button>
                 <button id="resetBtn" class="btn btn-danger">Reiniciar Jogo</button>
             </div>
@@ -76,6 +77,7 @@
         
         const numberInput = document.getElementById('numberInput');
         const drawBtn = document.getElementById('drawBtn');
+        const showLastBtn = document.getElementById('showLastBtn');
         const showAllBtn = document.getElementById('showAllBtn');
         const resetBtn = document.getElementById('resetBtn');
         const currentNumber = document.getElementById('currentNumber');
@@ -104,6 +106,7 @@
         
         // Event listeners
         drawBtn.addEventListener('click', drawNumber);
+        showLastBtn.addEventListener('click', showLastNumber);
         showAllBtn.addEventListener('click', showAllNumbers);
         resetBtn.addEventListener('click', resetGame);
         loadQrAdmin.addEventListener('click', () => loadQR('admin'));
@@ -125,6 +128,10 @@
             numberInput.value = '';
         });
         
+        socket.on('showLast', (data) => {
+            showSuccess('Mostrando último número sorteado!');
+        });
+
         socket.on('showAll', (data) => {
             showSuccess('Mostrando todos os números!');
         });
@@ -159,6 +166,14 @@
             }
         }
         
+        async function showLastNumber() {
+            try {
+                await fetch('/api/show-last', { method: 'POST' });
+            } catch (error) {
+                showError('Erro ao mostrar último número');
+            }
+        }
+
         async function showAllNumbers() {
             try {
                 await fetch('/api/show-all', { method: 'POST' });

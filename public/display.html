@@ -64,6 +64,7 @@
         
         socket.on('numberDrawn', (data) => {
             showCurrentNumber(data.number);
+            updateRecentNumbers(data.drawnNumbers);
             
             // Efeito de animação dramática
             const numberCircle = document.querySelector('.number-circle');
@@ -75,6 +76,16 @@
             }
         });
         
+        socket.on('showLast', (data) => {
+            if (data.number) {
+                showCurrentNumber(data.number);
+                updateRecentNumbers(data.drawnNumbers);
+            } else {
+                showWaitingMessage();
+                updateRecentNumbers(data.drawnNumbers);
+            }
+        });
+
         socket.on('showAll', (data) => {
             showAllNumbers(data.numbers);
         });
@@ -307,10 +318,31 @@
         document.addEventListener('mousemove', showWakeLockButton);
         document.addEventListener('touchstart', showWakeLockButton);
         
+        // Carregar estado inicial
+        async function loadInitialState() {
+            try {
+                const response = await fetch('/api/status');
+                const state = await response.json();
+                
+                if (state.isShowingAll && state.drawnNumbers.length > 0) {
+                    showAllNumbers(state.drawnNumbers.sort((a, b) => a - b));
+                } else if (state.currentNumber) {
+                    showCurrentNumber(state.currentNumber);
+                    updateRecentNumbers(state.drawnNumbers);
+                } else {
+                    showWaitingMessage();
+                }
+                updateRecentNumbers(state.drawnNumbers);
+            } catch (error) {
+                console.error('Erro ao carregar estado inicial:', error);
+            }
+        }
+
         // Tentar ativar automaticamente após carregar
         window.addEventListener('load', () => {
             setTimeout(enableWakeLock, 1000);
             showWakeLockButton();
+            loadInitialState();
         });
 
         // Reativar wake lock se a visibilidade mudar

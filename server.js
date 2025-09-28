@@ -106,10 +106,23 @@ app.post('/api/draw-number', (req, res) => {
     // Notificar todos os clientes
     io.emit('numberDrawn', {
         number: number,
-        total: gameState.drawnNumbers.length
+        total: gameState.drawnNumbers.length,
+        drawnNumbers: gameState.drawnNumbers
     });
     
     res.json({ success: true, number: number });
+});
+
+app.post('/api/show-last', (req, res) => {
+    gameState.isShowingAll = false;
+    
+    // Notificar todos os clientes para mostrar o último número
+    io.emit('showLast', {
+        number: gameState.currentNumber,
+        drawnNumbers: gameState.drawnNumbers
+    });
+    
+    res.json({ success: true, number: gameState.currentNumber });
 });
 
 app.post('/api/show-all', (req, res) => {
