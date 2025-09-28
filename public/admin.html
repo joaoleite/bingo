@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle do Bingo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+    <div class="admin-container">
+        <h1>🎮 Controle do Bingo</h1>
+        
+        <div class="control-panel">
+            <div class="input-section">
+                <label for="numberInput">Número sorteado (1-75):</label>
+                <input type="number" id="numberInput" min="1" max="75" placeholder="Digite o número">
+                <button id="drawBtn" class="btn btn-primary">Sortear Número</button>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="showAllBtn" class="btn btn-secondary">Mostrar Todos os Números</button>
+                <button id="resetBtn" class="btn btn-danger">Reiniciar Jogo</button>
+            </div>
+        </div>
+        
+        <div class="status-panel">
+            <h3>Status do Jogo</h3>
+            <div class="current-info">
+                <p><strong>Último número:</strong> <span id="currentNumber">-</span></p>
+                <p><strong>Total sorteados:</strong> <span id="totalNumbers">0</span></p>
+            </div>
+            
+            <div class="drawn-numbers">
+                <h4>Números sorteados:</h4>
+                <div id="drawnNumbersList" class="numbers-grid"></div>
+            </div>
+        </div>
+        
+        <div class="links">
+            <a href="/" class="btn btn-outline">← Voltar ao Menu</a>
+            <a href="display.html" target="_blank" class="btn btn-outline">Abrir Display 📺</a>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        const numberInput = document.getElementById('numberInput');
+        const drawBtn = document.getElementById('drawBtn');
+        const showAllBtn = document.getElementById('showAllBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const currentNumber = document.getElementById('currentNumber');
+        const totalNumbers = document.getElementById('totalNumbers');
+        const drawnNumbersList = document.getElementById('drawnNumbersList');
+        
+        // Event listeners
+        drawBtn.addEventListener('click', drawNumber);
+        showAllBtn.addEventListener('click', showAllNumbers);
+        resetBtn.addEventListener('click', resetGame);
+        
+        numberInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                drawNumber();
+            }
+        });
+        
+        // Socket events
+        socket.on('gameState', (state) => {
+            updateUI(state);
+        });
+        
+        socket.on('numberDrawn', (data) => {
+            showSuccess(`Número ${data.number} sorteado!`);
+            numberInput.value = '';
+        });
+        
+        socket.on('showAll', (data) => {
+            showSuccess('Mostrando todos os números!');
+        });
+        
+        socket.on('gameReset', () => {
+            showSuccess('Jogo reiniciado!');
+        });
+        
+        // Functions
+        async function drawNumber() {
+            const number = parseInt(numberInput.value);
+            
+            if (!number || number < 1 || number > 75) {
+                showError('Digite um número válido entre 1 e 75');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/draw-number', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.error);
+                }
+            } catch (error) {
+                showError('Erro ao sortear número');
+            }
+        }
+        
+        async function showAllNumbers() {
+            try {
+                await fetch('/api/show-all', { method: 'POST' });
+            } catch (error) {
+                showError('Erro ao mostrar números');
+            }
+        }
+        
+        async function resetGame() {
+            if (confirm('Tem certeza que deseja reiniciar o jogo?')) {
+                try {
+                    await fetch('/api/reset', { method: 'POST' });
+                } catch (error) {
+                    showError('Erro ao reiniciar jogo');
+                }
+            }
+        }
+        
+        function updateUI(state) {
+            currentNumber.textContent = state.currentNumber || '-';
+            totalNumbers.textContent = state.drawnNumbers.length;
+            
+            drawnNumbersList.innerHTML = '';
+            state.drawnNumbers.sort((a, b) => a - b).forEach(num => {
+                const span = document.createElement('span');
+                span.className = 'drawn-number';
+                span.textContent = num;
+                drawnNumbersList.appendChild(span);
+            });
+        }
+        
+        function showSuccess(message) {
+            showNotification(message, 'success');
+        }
+        
+        function showError(message) {
+            showNotification(message, 'error');
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        // Load initial state
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(state => updateUI(state));
+    </script>
+</body>
+</html>

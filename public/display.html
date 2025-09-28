@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display do Bingo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="display-page">
+    <div class="display-container">
+        <div id="currentDisplay" class="current-number-display">
+            <div class="waiting-message">
+                <h1>🎯 BINGO</h1>
+                <p>Aguardando próximo número...</p>
+            </div>
+        </div>
+        
+        <div id="allNumbersDisplay" class="all-numbers-display" style="display: none;">
+            <h2>Números Sorteados</h2>
+            <div id="allNumbersGrid" class="all-numbers-grid"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        const currentDisplay = document.getElementById('currentDisplay');
+        const allNumbersDisplay = document.getElementById('allNumbersDisplay');
+        const allNumbersGrid = document.getElementById('allNumbersGrid');
+        
+        // Socket events
+        socket.on('gameState', (state) => {
+            if (state.isShowingAll && state.drawnNumbers.length > 0) {
+                showAllNumbers(state.drawnNumbers);
+            } else if (state.currentNumber) {
+                showCurrentNumber(state.currentNumber);
+            } else {
+                showWaitingMessage();
+            }
+        });
+        
+        socket.on('numberDrawn', (data) => {
+            showCurrentNumber(data.number);
+            
+            // Efeito de animação dramática
+            const numberCircle = document.querySelector('.number-circle');
+            if (numberCircle) {
+                numberCircle.style.animation = 'none';
+                setTimeout(() => {
+                    numberCircle.style.animation = 'numberEntrance 1s ease-out, pulse 2s ease-in-out 1s';
+                }, 10);
+            }
+        });
+        
+        socket.on('showAll', (data) => {
+            showAllNumbers(data.numbers);
+        });
+        
+        socket.on('gameReset', () => {
+            showWaitingMessage();
+        });
+        
+        // Functions
+        function showCurrentNumber(number) {
+            allNumbersDisplay.style.display = 'none';
+            currentDisplay.style.display = 'flex';
+            
+            currentDisplay.innerHTML = `
+                <div class="number-circle">
+                    <span class="number">${number}</span>
+                </div>
+                <div class="number-label">NÚMERO SORTEADO</div>
+            `;
+        }
+        
+        function showAllNumbers(numbers) {
+            currentDisplay.style.display = 'none';
+            allNumbersDisplay.style.display = 'block';
+            
+            allNumbersGrid.innerHTML = '';
+            
+            // Definir as colunas do BINGO
+            const columns = [
+                { letter: 'B', start: 1, end: 15, class: 'b' },
+                { letter: 'I', start: 16, end: 30, class: 'i' },
+                { letter: 'N', start: 31, end: 45, class: 'n' },
+                { letter: 'G', start: 46, end: 60, class: 'g' },
+                { letter: 'O', start: 61, end: 75, class: 'o' }
+            ];
+            
+            // Criar cada coluna
+            columns.forEach(column => {
+                const columnDiv = document.createElement('div');
+                columnDiv.className = 'bingo-column';
+                
+                // Cabeçalho da coluna
+                const header = document.createElement('div');
+                header.className = `column-header ${column.class}`;
+                header.textContent = column.letter;
+                columnDiv.appendChild(header);
+                
+                // Container dos números
+                const numbersContainer = document.createElement('div');
+                numbersContainer.className = 'column-numbers';
+                
+                // Adicionar números da coluna
+                for (let i = column.start; i <= column.end; i++) {
+                    const numberDiv = document.createElement('div');
+                    numberDiv.className = 'number-cell';
+                    numberDiv.textContent = i;
+                    
+                    if (numbers.includes(i)) {
+                        numberDiv.classList.add('drawn');
+                    }
+                    
+                    numbersContainer.appendChild(numberDiv);
+                }
+                
+                columnDiv.appendChild(numbersContainer);
+                allNumbersGrid.appendChild(columnDiv);
+            });
+        }
+        
+        function showWaitingMessage() {
+            currentDisplay.style.display = 'flex';
+            allNumbersDisplay.style.display = 'none';
+            
+            currentDisplay.innerHTML = `
+                <div class="waiting-message">
+                    <h1>🎯 BINGO</h1>
+                    <p>Aguardando próximo número...</p>
+                </div>
+            `;
+        }
+        
+        // Modo fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F11' || (e.key === 'f' && e.ctrlKey)) {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+        });
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Auto-refresh connection
+        setInterval(() => {
+            if (!socket.connected) {
+                socket.connect();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
