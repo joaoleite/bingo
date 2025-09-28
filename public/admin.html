@@ -13,8 +13,11 @@
         <div class="control-panel">
             <div class="input-section">
                 <label for="numberInput">Número sorteado (1-75):</label>
-                <input type="number" id="numberInput" min="1" max="75" placeholder="Digite o número">
-                <button id="drawBtn" class="btn btn-primary">Sortear Número</button>
+                <div class="number-input-group">
+                    <input type="number" id="numberInput" min="1" max="75" placeholder="Digite o número">
+                    <button id="drawBtn" class="btn btn-primary">Sortear Número</button>
+                    <button id="randomBtn" class="btn btn-success">🎲 Sortear Aleatório</button>
+                </div>
             </div>
             
             <div class="action-buttons">
@@ -75,8 +78,14 @@
     <script>
         const socket = io();
         
+        // Função para formatar números com zero à esquerda
+        function formatNumber(number) {
+            return number.toString().padStart(2, '0');
+        }
+        
         const numberInput = document.getElementById('numberInput');
         const drawBtn = document.getElementById('drawBtn');
+        const randomBtn = document.getElementById('randomBtn');
         const showLastBtn = document.getElementById('showLastBtn');
         const showAllBtn = document.getElementById('showAllBtn');
         const resetBtn = document.getElementById('resetBtn');
@@ -106,6 +115,7 @@
         
         // Event listeners
         drawBtn.addEventListener('click', drawNumber);
+        randomBtn.addEventListener('click', drawRandomNumber);
         showLastBtn.addEventListener('click', showLastNumber);
         showAllBtn.addEventListener('click', showAllNumbers);
         resetBtn.addEventListener('click', resetGame);
@@ -141,6 +151,38 @@
         });
         
         // Functions
+        async function drawRandomNumber() {
+            // Pegar números já sorteados do estado atual
+            try {
+                const response = await fetch('/api/status');
+                const state = await response.json();
+                
+                // Criar array com todos os números de 1 a 75 que ainda não foram sorteados
+                const availableNumbers = [];
+                for (let i = 1; i <= 75; i++) {
+                    if (!state.drawnNumbers.includes(i)) {
+                        availableNumbers.push(i);
+                    }
+                }
+                
+                if (availableNumbers.length === 0) {
+                    showError('Todos os números já foram sorteados!');
+                    return;
+                }
+                
+                // Sortear um número aleatório dos disponíveis
+                const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+                const randomNumber = availableNumbers[randomIndex];
+                
+                // Preencher o input e sortear
+                numberInput.value = randomNumber;
+                await drawNumber();
+                
+            } catch (error) {
+                showError('Erro ao sortear número aleatório');
+            }
+        }
+
         async function drawNumber() {
             const number = parseInt(numberInput.value);
             
@@ -193,7 +235,7 @@
         }
         
         function updateUI(state) {
-            currentNumber.textContent = state.currentNumber || '-';
+            currentNumber.textContent = state.currentNumber ? formatNumber(state.currentNumber) : '-';
             totalNumbers.textContent = state.drawnNumbers.length;
             
             // Mostrar números em ordem de sorteio (não ordenados)
@@ -201,7 +243,7 @@
             state.drawnNumbers.forEach((num, index) => {
                 const span = document.createElement('span');
                 span.className = 'drawn-number';
-                span.textContent = num;
+                span.textContent = formatNumber(num);
                 
                 // Destacar o último número sorteado
                 if (index === state.drawnNumbers.length - 1 && state.drawnNumbers.length > 0) {
@@ -214,7 +256,7 @@
             // Mostrar sequência completa
             if (numbersSequence) {
                 numbersSequence.textContent = state.drawnNumbers.length > 0 
-                    ? state.drawnNumbers.join(' → ') 
+                    ? state.drawnNumbers.map(num => formatNumber(num)).join(' → ') 
                     : '-';
             }
         }

@@ -37,6 +37,11 @@
     <script>
         const socket = io();
         
+        // Função para formatar números com zero à esquerda
+        function formatNumber(number) {
+            return number.toString().padStart(2, '0');
+        }
+        
         const currentDisplay = document.getElementById('currentDisplay');
         const allNumbersDisplay = document.getElementById('allNumbersDisplay');
         const allNumbersGrid = document.getElementById('allNumbersGrid');
@@ -62,18 +67,9 @@
             updateRecentNumbers(state.drawnNumbers);
         });
         
-        socket.on('numberDrawn', (data) => {
+                socket.on('numberDrawn', (data) => {
             showCurrentNumber(data.number);
             updateRecentNumbers(data.drawnNumbers);
-            
-            // Efeito de animação dramática
-            const numberCircle = document.querySelector('.number-circle');
-            if (numberCircle) {
-                numberCircle.style.animation = 'none';
-                setTimeout(() => {
-                    numberCircle.style.animation = 'numberEntrance 1s ease-out, pulse 2s ease-in-out 1s';
-                }, 10);
-            }
         });
         
         socket.on('showLast', (data) => {
@@ -101,9 +97,11 @@
             currentDisplay.style.display = 'flex';
             recentNumbers.style.display = 'block';
             
+            const bingoLetter = getBingoLetter(number);
             currentDisplay.innerHTML = `
-                <div class="number-circle">
-                    <span class="number">${number}</span>
+                <div class="number-display ${bingoLetter.toLowerCase()}">
+                    <div class="letter">${bingoLetter}</div>
+                    <span class="number">${formatNumber(number)}</span>
                 </div>
                 <div class="number-label">NÚMERO SORTEADO</div>
             `;
@@ -144,7 +142,7 @@
                 for (let i = column.start; i <= column.end; i++) {
                     const numberDiv = document.createElement('div');
                     numberDiv.className = 'number-cell';
-                    numberDiv.textContent = i;
+                    numberDiv.textContent = formatNumber(i);
                     
                     if (numbers.includes(i)) {
                         numberDiv.classList.add('drawn');
@@ -172,7 +170,9 @@
         }
         
         function updateRecentNumbers(drawnNumbers) {
-            if (!recentNumbersList) return;
+            if (!recentNumbersList) {
+                return;
+            }
             
             // Pegar os últimos 7 números em ordem de sorteio
             const recentNums = drawnNumbers.slice(-7);
@@ -191,7 +191,7 @@
             recentNums.forEach((num, index) => {
                 const numElement = document.createElement('div');
                 numElement.className = 'recent-number';
-                numElement.textContent = num;
+                numElement.textContent = formatNumber(num);
                 
                 // Destacar o último número sorteado
                 if (index === recentNums.length - 1) {

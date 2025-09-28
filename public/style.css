@@ -123,6 +123,27 @@ body {
     color: white;
 }
 
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #219a52;
+}
+
+.number-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.number-input-group input {
+    flex: 1;
+    margin-top: 0 !important;
+}
+
 /* Página de admin */
 .admin-page {
     background: #ecf0f1;
@@ -702,6 +723,16 @@ body {
         width: 100%;
         margin-bottom: 10px;
         margin-right: 0;
+    }
+    
+    .number-input-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .number-input-group input,
+    .number-input-group button {
+        width: 100%;
     }
     
     .qr-container {
