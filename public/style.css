@@ -181,12 +181,64 @@ body {
     flex-wrap: wrap;
 }
 
-.status-panel {
+.network-panel, .status-panel {
     background: white;
     padding: 2rem;
     border-radius: 10px;
     margin-bottom: 2rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.network-info {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.network-info p {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #3498db;
+    word-break: break-all;
+}
+
+.qr-codes h4 {
+    margin-bottom: 1rem;
+    color: #34495e;
+    text-align: center;
+}
+
+.qr-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.qr-item {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px dashed #bdc3c7;
+}
+
+.qr-item h5 {
+    margin-bottom: 1rem;
+    color: #34495e;
+}
+
+.qr-item img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.qr-item button {
+    margin-top: 1rem;
 }
 
 .status-panel h3 {
@@ -580,6 +632,15 @@ body {
         margin-bottom: 10px;
         margin-right: 0;
     }
+    
+    .qr-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .network-info p {
+        word-break: break-all;
+        font-size: 0.9rem;
+    }
 }
 
 /* Admin responsivo - Tablet */
@@ -588,8 +649,12 @@ body {
         padding: 1.5rem;
     }
     
-    .control-panel, .status-panel {
+    .control-panel, .status-panel, .network-panel {
         padding: 1.5rem;
+    }
+    
+    .qr-container {
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .input-section input {

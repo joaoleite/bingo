@@ -23,6 +23,31 @@
             </div>
         </div>
         
+        <div class="network-panel">
+            <h3>🌐 Informações da Rede</h3>
+            <div class="network-info">
+                <p><strong>IP da rede:</strong> <span id="networkIP">Carregando...</span></p>
+                <p><strong>URL Admin:</strong> <span id="adminUrl">Carregando...</span></p>
+                <p><strong>URL Display:</strong> <span id="displayUrl">Carregando...</span></p>
+            </div>
+            
+            <div class="qr-codes">
+                <h4>📱 QR Codes para Acesso Rápido</h4>
+                <div class="qr-container">
+                    <div class="qr-item">
+                        <h5>🎮 Admin</h5>
+                        <img id="qrAdmin" src="" alt="QR Admin" style="display: none;">
+                        <button id="loadQrAdmin" class="btn btn-outline">Gerar QR Admin</button>
+                    </div>
+                    <div class="qr-item">
+                        <h5>📺 Display</h5>
+                        <img id="qrDisplay" src="" alt="QR Display" style="display: none;">
+                        <button id="loadQrDisplay" class="btn btn-outline">Gerar QR Display</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="status-panel">
             <h3>Status do Jogo</h3>
             <div class="current-info">
@@ -54,10 +79,21 @@
         const totalNumbers = document.getElementById('totalNumbers');
         const drawnNumbersList = document.getElementById('drawnNumbersList');
         
+        // Elementos de rede
+        const networkIP = document.getElementById('networkIP');
+        const adminUrl = document.getElementById('adminUrl');
+        const displayUrl = document.getElementById('displayUrl');
+        const qrAdmin = document.getElementById('qrAdmin');
+        const qrDisplay = document.getElementById('qrDisplay');
+        const loadQrAdmin = document.getElementById('loadQrAdmin');
+        const loadQrDisplay = document.getElementById('loadQrDisplay');
+        
         // Event listeners
         drawBtn.addEventListener('click', drawNumber);
         showAllBtn.addEventListener('click', showAllNumbers);
         resetBtn.addEventListener('click', resetGame);
+        loadQrAdmin.addEventListener('click', () => loadQR('admin'));
+        loadQrDisplay.addEventListener('click', () => loadQR('display'));
         
         numberInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -160,10 +196,47 @@
             }, 3000);
         }
         
+        // Load network info
+        async function loadNetworkInfo() {
+            try {
+                const response = await fetch('/api/network-info');
+                const info = await response.json();
+                
+                networkIP.textContent = info.ip;
+                adminUrl.textContent = info.adminUrl;
+                displayUrl.textContent = info.displayUrl;
+            } catch (error) {
+                console.error('Erro ao carregar info da rede:', error);
+            }
+        }
+        
+        // Load QR Code
+        async function loadQR(type) {
+            try {
+                const response = await fetch(`/api/qr/${type}`);
+                const data = await response.json();
+                
+                if (type === 'admin') {
+                    qrAdmin.src = data.qrCode;
+                    qrAdmin.style.display = 'block';
+                    loadQrAdmin.style.display = 'none';
+                } else {
+                    qrDisplay.src = data.qrCode;
+                    qrDisplay.style.display = 'block';
+                    loadQrDisplay.style.display = 'none';
+                }
+            } catch (error) {
+                showError('Erro ao gerar QR Code');
+            }
+        }
+        
         // Load initial state
         fetch('/api/status')
             .then(response => response.json())
             .then(state => updateUI(state));
+            
+        // Load network info
+        loadNetworkInfo();
     </script>
 </body>
 </html>
