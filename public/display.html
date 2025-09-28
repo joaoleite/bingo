@@ -19,15 +19,28 @@
             <h2>Números Sorteados</h2>
             <div id="allNumbersGrid" class="all-numbers-grid"></div>
         </div>
+        
+        <!-- Controle de Wake Lock -->
+        <div id="wakeLockControl" class="wake-lock-control">
+            <button id="wakeLockBtn" class="wake-lock-btn">🔒 Manter Tela Ativa</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="nosleep.js"></script>
     <script>
         const socket = io();
         
         const currentDisplay = document.getElementById('currentDisplay');
         const allNumbersDisplay = document.getElementById('allNumbersDisplay');
         const allNumbersGrid = document.getElementById('allNumbersGrid');
+        
+        // Inicializar NoSleep
+        const noSleep = new NoSleep();
+        let wakeLockEnabled = false;
+        const wakeLockBtn = document.getElementById('wakeLockBtn');
+        const wakeLockControl = document.getElementById('wakeLockControl');
+        let hideButtonTimeout;
         
         // Socket events
         socket.on('gameState', (state) => {
@@ -150,6 +163,119 @@
             }
         }
         
+        // Função para ativar/desativar NoSleep
+        async function toggleWakeLock() {
+            if (!wakeLockEnabled) {
+                try {
+                    await noSleep.enable();
+                    wakeLockEnabled = true;
+                    updateWakeLockButton();
+                    showWakeLockStatus('🔒 Tela sempre ativa!');
+                } catch (error) {
+                    console.error('Erro ao ativar wake lock:', error);
+                    showWakeLockStatus('⚠️ Erro ao manter tela ativa');
+                }
+            } else {
+                noSleep.disable();
+                wakeLockEnabled = false;
+                updateWakeLockButton();
+                showWakeLockStatus('🔓 Tela pode desligar');
+            }
+        }
+
+        // Atualizar aparência do botão
+        function updateWakeLockButton() {
+            if (wakeLockBtn) {
+                if (wakeLockEnabled) {
+                    wakeLockBtn.textContent = '🔓 Permitir Desligar';
+                    wakeLockBtn.classList.add('active');
+                } else {
+                    wakeLockBtn.textContent = '🔒 Manter Tela Ativa';
+                    wakeLockBtn.classList.remove('active');
+                }
+            }
+        }
+
+        // Função para ativar NoSleep automaticamente
+        async function enableWakeLock() {
+            if (!wakeLockEnabled) {
+                await toggleWakeLock();
+            }
+        }
+
+        // Função para mostrar status do wake lock
+        function showWakeLockStatus(message) {
+            const statusDiv = document.createElement('div');
+            statusDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 25px;
+                font-size: 14px;
+                z-index: 1000;
+                backdrop-filter: blur(10px);
+            `;
+            statusDiv.textContent = message;
+            document.body.appendChild(statusDiv);
+            
+            setTimeout(() => {
+                statusDiv.remove();
+            }, 3000);
+        }
+
+        // Event listener para o botão
+        if (wakeLockBtn) {
+            wakeLockBtn.addEventListener('click', toggleWakeLock);
+        }
+
+        // Ativar wake lock no primeiro toque/clique (exceto no botão)
+        document.addEventListener('click', (e) => {
+            if (e.target !== wakeLockBtn) {
+                enableWakeLock();
+            }
+        }, { once: true });
+        
+        document.addEventListener('touchstart', (e) => {
+            if (e.target !== wakeLockBtn) {
+                enableWakeLock();
+            }
+        }, { once: true });
+        
+        // Mostrar/ocultar botão automaticamente
+        function showWakeLockButton() {
+            if (wakeLockControl) {
+                wakeLockControl.style.opacity = '0.8';
+                
+                // Ocultar após 5 segundos
+                clearTimeout(hideButtonTimeout);
+                hideButtonTimeout = setTimeout(() => {
+                    if (wakeLockControl) {
+                        wakeLockControl.style.opacity = '0.2';
+                    }
+                }, 5000);
+            }
+        }
+
+        // Mostrar botão com movimento do mouse/toque
+        document.addEventListener('mousemove', showWakeLockButton);
+        document.addEventListener('touchstart', showWakeLockButton);
+        
+        // Tentar ativar automaticamente após carregar
+        window.addEventListener('load', () => {
+            setTimeout(enableWakeLock, 1000);
+            showWakeLockButton();
+        });
+
+        // Reativar wake lock se a visibilidade mudar
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && wakeLockEnabled) {
+                setTimeout(enableWakeLock, 500);
+            }
+        });
+
         // Auto-refresh connection
         setInterval(() => {
             if (!socket.connected) {
