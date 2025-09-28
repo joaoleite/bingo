@@ -88,6 +88,16 @@
         const loadQrAdmin = document.getElementById('loadQrAdmin');
         const loadQrDisplay = document.getElementById('loadQrDisplay');
         
+        console.log('Elementos encontrados:', {
+            networkIP: !!networkIP,
+            adminUrl: !!adminUrl,
+            displayUrl: !!displayUrl,
+            qrAdmin: !!qrAdmin,
+            qrDisplay: !!qrDisplay,
+            loadQrAdmin: !!loadQrAdmin,
+            loadQrDisplay: !!loadQrDisplay
+        });
+        
         // Event listeners
         drawBtn.addEventListener('click', drawNumber);
         showAllBtn.addEventListener('click', showAllNumbers);
@@ -199,12 +209,17 @@
         // Load network info
         async function loadNetworkInfo() {
             try {
+                console.log('Carregando informações da rede...');
                 const response = await fetch('/api/network-info');
                 const info = await response.json();
                 
-                networkIP.textContent = info.ip;
-                adminUrl.textContent = info.adminUrl;
-                displayUrl.textContent = info.displayUrl;
+                console.log('Info da rede recebida:', info);
+                
+                if (networkIP) networkIP.textContent = info.ip;
+                if (adminUrl) adminUrl.textContent = info.adminUrl;
+                if (displayUrl) displayUrl.textContent = info.displayUrl;
+                
+                console.log('Informações da rede carregadas com sucesso');
             } catch (error) {
                 console.error('Erro ao carregar info da rede:', error);
             }
@@ -213,20 +228,28 @@
         // Load QR Code
         async function loadQR(type) {
             try {
+                console.log(`Gerando QR Code para ${type}...`);
                 const response = await fetch(`/api/qr/${type}`);
                 const data = await response.json();
                 
+                console.log(`QR Code ${type} gerado:`, data.url);
+                
                 if (type === 'admin') {
-                    qrAdmin.src = data.qrCode;
-                    qrAdmin.style.display = 'block';
-                    loadQrAdmin.style.display = 'none';
+                    if (qrAdmin && loadQrAdmin) {
+                        qrAdmin.src = data.qrCode;
+                        qrAdmin.style.display = 'block';
+                        loadQrAdmin.style.display = 'none';
+                    }
                 } else {
-                    qrDisplay.src = data.qrCode;
-                    qrDisplay.style.display = 'block';
-                    loadQrDisplay.style.display = 'none';
+                    if (qrDisplay && loadQrDisplay) {
+                        qrDisplay.src = data.qrCode;
+                        qrDisplay.style.display = 'block';
+                        loadQrDisplay.style.display = 'none';
+                    }
                 }
             } catch (error) {
-                showError('Erro ao gerar QR Code');
+                console.error('Erro ao gerar QR Code:', error);
+                showError('Erro ao gerar QR Code: ' + error.message);
             }
         }
         
