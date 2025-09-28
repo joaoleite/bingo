@@ -56,8 +56,11 @@
             </div>
             
             <div class="drawn-numbers">
-                <h4>Números sorteados:</h4>
+                <h4>Números sorteados (em ordem):</h4>
                 <div id="drawnNumbersList" class="numbers-grid"></div>
+                <div class="numbers-summary">
+                    <p><strong>Sequência completa:</strong> <span id="numbersSequence">-</span></p>
+                </div>
             </div>
         </div>
         
@@ -78,6 +81,7 @@
         const currentNumber = document.getElementById('currentNumber');
         const totalNumbers = document.getElementById('totalNumbers');
         const drawnNumbersList = document.getElementById('drawnNumbersList');
+        const numbersSequence = document.getElementById('numbersSequence');
         
         // Elementos de rede
         const networkIP = document.getElementById('networkIP');
@@ -177,13 +181,27 @@
             currentNumber.textContent = state.currentNumber || '-';
             totalNumbers.textContent = state.drawnNumbers.length;
             
+            // Mostrar números em ordem de sorteio (não ordenados)
             drawnNumbersList.innerHTML = '';
-            state.drawnNumbers.sort((a, b) => a - b).forEach(num => {
+            state.drawnNumbers.forEach((num, index) => {
                 const span = document.createElement('span');
                 span.className = 'drawn-number';
                 span.textContent = num;
+                
+                // Destacar o último número sorteado
+                if (index === state.drawnNumbers.length - 1 && state.drawnNumbers.length > 0) {
+                    span.classList.add('latest');
+                }
+                
                 drawnNumbersList.appendChild(span);
             });
+            
+            // Mostrar sequência completa
+            if (numbersSequence) {
+                numbersSequence.textContent = state.drawnNumbers.length > 0 
+                    ? state.drawnNumbers.join(' → ') 
+                    : '-';
+            }
         }
         
         function showSuccess(message) {

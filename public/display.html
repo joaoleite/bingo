@@ -15,6 +15,12 @@
             </div>
         </div>
         
+        <!-- Últimos números sorteados -->
+        <div id="recentNumbers" class="recent-numbers">
+            <h3>Últimos números sorteados:</h3>
+            <div id="recentNumbersList" class="recent-numbers-list"></div>
+        </div>
+        
         <div id="allNumbersDisplay" class="all-numbers-display" style="display: none;">
             <h2>Números Sorteados</h2>
             <div id="allNumbersGrid" class="all-numbers-grid"></div>
@@ -34,6 +40,8 @@
         const currentDisplay = document.getElementById('currentDisplay');
         const allNumbersDisplay = document.getElementById('allNumbersDisplay');
         const allNumbersGrid = document.getElementById('allNumbersGrid');
+        const recentNumbers = document.getElementById('recentNumbers');
+        const recentNumbersList = document.getElementById('recentNumbersList');
         
         // Inicializar NoSleep
         const noSleep = new NoSleep();
@@ -51,6 +59,7 @@
             } else {
                 showWaitingMessage();
             }
+            updateRecentNumbers(state.drawnNumbers);
         });
         
         socket.on('numberDrawn', (data) => {
@@ -72,12 +81,14 @@
         
         socket.on('gameReset', () => {
             showWaitingMessage();
+            updateRecentNumbers([]);
         });
         
         // Functions
         function showCurrentNumber(number) {
             allNumbersDisplay.style.display = 'none';
             currentDisplay.style.display = 'flex';
+            recentNumbers.style.display = 'block';
             
             currentDisplay.innerHTML = `
                 <div class="number-circle">
@@ -90,6 +101,7 @@
         function showAllNumbers(numbers) {
             currentDisplay.style.display = 'none';
             allNumbersDisplay.style.display = 'block';
+            recentNumbers.style.display = 'none';
             
             allNumbersGrid.innerHTML = '';
             
@@ -138,6 +150,7 @@
         function showWaitingMessage() {
             currentDisplay.style.display = 'flex';
             allNumbersDisplay.style.display = 'none';
+            recentNumbers.style.display = 'none';
             
             currentDisplay.innerHTML = `
                 <div class="waiting-message">
@@ -145,6 +158,37 @@
                     <p>Aguardando próximo número...</p>
                 </div>
             `;
+        }
+        
+        function updateRecentNumbers(drawnNumbers) {
+            if (!recentNumbersList) return;
+            
+            // Pegar os últimos 7 números em ordem de sorteio
+            const recentNums = drawnNumbers.slice(-7);
+            
+            // Limpar lista atual
+            recentNumbersList.innerHTML = '';
+            
+            if (recentNums.length === 0) {
+                recentNumbers.style.display = 'none';
+                return;
+            }
+            
+            recentNumbers.style.display = 'block';
+            
+            // Criar elementos para cada número
+            recentNums.forEach((num, index) => {
+                const numElement = document.createElement('div');
+                numElement.className = 'recent-number';
+                numElement.textContent = num;
+                
+                // Destacar o último número sorteado
+                if (index === recentNums.length - 1) {
+                    numElement.classList.add('latest');
+                }
+                
+                recentNumbersList.appendChild(numElement);
+            });
         }
         
         // Modo fullscreen

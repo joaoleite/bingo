@@ -279,6 +279,26 @@ body {
     text-align: center;
     font-weight: bold;
     font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.drawn-number.latest {
+    background: #e74c3c;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(231, 76, 60, 0.4);
+}
+
+.numbers-summary {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #ecf0f1;
+    border-radius: 5px;
+    border-left: 4px solid #3498db;
+}
+
+.numbers-summary p {
+    margin: 0;
+    word-break: break-all;
 }
 
 .links {
@@ -436,6 +456,57 @@ body {
     color: white;
     font-weight: 900;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Números recentes na tela de exibição */
+.recent-numbers {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 500;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 1rem 2rem;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    color: white;
+}
+
+.recent-numbers h3 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.recent-numbers-list {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.recent-number {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.8rem 1rem;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    font-weight: bold;
+    min-width: 50px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.recent-number.latest {
+    background: rgba(52, 152, 219, 0.8);
+    border-color: #3498db;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.4);
 }
 
 /* Animações */
@@ -786,5 +857,26 @@ body {
     .wake-lock-btn {
         font-size: 12px;
         padding: 10px 20px;
+    }
+    
+    .recent-numbers {
+        bottom: 120px;
+        padding: 0.8rem 1rem;
+    }
+    
+    .recent-numbers h3 {
+        font-size: 1rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    .recent-numbers-list {
+        gap: 0.5rem;
+    }
+    
+    .recent-number {
+        font-size: 1rem;
+        padding: 0.6rem 0.8rem;
+        min-width: 40px;
+        min-height: 40px;
     }
 }
