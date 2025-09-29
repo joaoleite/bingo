@@ -17,7 +17,6 @@
         
         <!-- Últimos números sorteados -->
         <div id="recentNumbers" class="recent-numbers">
-            <h3>Últimos números sorteados:</h3>
             <div id="recentNumbersList" class="recent-numbers-list"></div>
         </div>
         
@@ -110,13 +109,29 @@
             recentNumbers.style.display = 'block';
             
             const bingoLetter = getBingoLetter(number);
+            const formattedNumber = formatNumber(number);
+            
             currentDisplay.innerHTML = `
-                <div class="number-display ${bingoLetter.toLowerCase()}">
-                    <div class="letter">${bingoLetter}</div>
-                    <span class="number">${formatNumber(number)}</span>
+                <div class="number-container">
+                    <div class="bingo-ball ${bingoLetter.toLowerCase()}" style="animation: numberEntrance 0.6s ease-out;">
+                        <div class="ball-content">
+                            <div class="bingo-letter">${bingoLetter}</div>
+                            <div class="bingo-number">${formattedNumber}</div>
+                        </div>
+                    </div>
+                    <div class="number-info">
+                        <div class="number-label">NÚMERO SORTEADO</div>
+                    </div>
                 </div>
-                <div class="number-label">NÚMERO SORTEADO</div>
             `;
+            
+            // Adicionar efeito de pulso após a animação de entrada
+            setTimeout(() => {
+                const ball = currentDisplay.querySelector('.bingo-ball');
+                if (ball) {
+                    ball.style.animation = 'numberEntrance 0.6s ease-out, pulse 2s infinite 0.6s';
+                }
+            }, 100);
         }
         
         function showAllNumbers(numbers) {
