@@ -98,6 +98,7 @@
         });
         
         socket.on('gameReset', () => {
+            console.log('Evento gameReset recebido no display');
             showWaitingMessage();
             updateRecentNumbers([]);
         });

@@ -137,14 +137,19 @@ app.post('/api/show-all', (req, res) => {
 });
 
 app.post('/api/reset', (req, res) => {
+    console.log('Reset solicitado');
+    
     gameState = {
         currentNumber: null,
         drawnNumbers: [],
         isShowingAll: false
     };
     
+    console.log('Estado resetado:', gameState);
+    
     // Notificar todos os clientes sobre o reset
     io.emit('gameReset');
+    console.log('Evento gameReset enviado para todos os clientes');
     
     res.json({ success: true });
 });
