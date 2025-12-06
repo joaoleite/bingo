@@ -1,61 +1,59 @@
 # Sistema de Bingo - Cliente/Servidor
 
-Sistema completo de Bingo com interface web para controle e exibição em tempo real.
+Sistema completo de Bingo com interface web real-time, controle de acesso e persistência de dados.
 
 ## 🚀 Funcionalidades
 
-- **Controle Manual**: Interface para inserir números sorteados
-- **Display em Tempo Real**: Tela de exibição que atualiza automaticamente
-- **Comunicação WebSocket**: Atualizações instantâneas para todos os clientes
-- **Modo Tela Cheia**: Display otimizado para projeção
-- **Histórico Completo**: Visualização de todos os números sorteados
+- **Controle Seguro**: Painel administrativo protegido por senha.
+- **Display em Tempo Real**: Atualização instantânea via WebSockets.
+- **Persistência**: O jogo salva o estado automaticamente (não perde dados se o servidor reiniciar).
+- **QR Codes**: Geração automática de QR Codes para fácil acesso via celular.
+- **Docker Ready**: Pronto para deploy no Coolify ou qualquer ambiente Docker.
 
-## 📋 Como usar
+## 📋 Como usar (Local)
 
 ### 1. Instalação
 ```bash
 npm install
 ```
 
-### 2. Executar o servidor
+### 2. Configuração (Opcional)
+Você pode definir a senha de admin via variável de ambiente (padrão: `bingo2024`):
+```bash
+export ADMIN_PASSWORD="sua_senha_segura"
+```
+
+### 3. Executar
 ```bash
 npm start
 ```
 
-### 3. Acessar o sistema
-- **Menu Principal**: http://localhost:3000
-- **Interface de Controle**: http://localhost:3000/admin.html
-- **Display de Exibição**: http://localhost:3000/display.html
+### 4. Acessar
+- **Display (Público)**: http://localhost:3000/display.html
+- **Admin (Privado)**: http://localhost:3000/admin.html
+  - **Usuário**: `admin`
+  - **Senha**: `bingo2024` (ou a definida no passo 2)
 
-## 🎮 Instruções de Uso
+## 🐳 Como rodar com Docker
 
-1. **Abra o Controle** (`admin.html`) em um dispositivo para inserir os números
-2. **Abra o Display** (`display.html`) na tela que será mostrada ao público
-3. **Digite os números** sorteados no controle - eles aparecerão automaticamente no display
-4. **Use "Mostrar Todos"** para exibir uma grade com todos os números sorteados
-5. **Use "Reiniciar"** para começar um novo jogo
+Ideal para deploy no **Coolify**.
 
-## ⌨️ Atalhos
+```bash
+# Construir a imagem
+docker build -t bingo-server .
 
-- **F11 ou Ctrl+F**: Ativar/desativar tela cheia no display
-- **Enter**: Confirmar número no controle
+# Rodar o container
+docker run -p 3000:3000 -d bingo-server
+```
 
-## 🔧 API Endpoints
+## 🛠️ Tecnologias
 
-- `GET /api/status` - Status atual do jogo
-- `POST /api/draw-number` - Sortear novo número
-- `POST /api/show-all` - Mostrar todos os números
-- `POST /api/reset` - Reiniciar jogo
+- **Backend**: Node.js, Express, Socket.io
+- **Segurança**: Express Basic Auth
+- **Persistência**: JSON File Storage
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
 
-## 🎯 Recursos Técnicos
+## 📱 Atalhos e Dicas
 
-- **Backend**: Node.js + Express + Socket.io
-- **Frontend**: HTML5 + CSS3 + JavaScript
-- **Comunicação**: WebSocket para tempo real
-- **Design**: Responsivo e otimizado para projeção
-
-## 📱 Compatibilidade
-
-- Navegadores modernos (Chrome, Firefox, Safari, Edge)
-- Dispositivos móveis e desktop
-- Modo tela cheia para projeções
+- **F11**: Tela cheia no display.
+- **NoSleep**: O display mantém a tela do celular/tablet acesa automaticamente.

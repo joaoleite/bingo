@@ -3,46 +3,54 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const QRCode = require('qrcode');
-const os = require('os');
+const basicAuth = require('express-basic-auth');
+
+const { getNetworkIP } = require('./utils');
+const gameState = require('./gameState');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Servir arquivos estáticos
-app.use(express.static(path.join(__dirname, 'public')));
+// Configuração de Segurança Básica
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'bingo2024';
+const authMiddleware = basicAuth({
+    users: { 'admin': ADMIN_PASSWORD },
+    challenge: true,
+    realm: 'BingoAdminArea'
+});
+
+// Middleware
 app.use(express.json());
 
-// Estado do jogo
-let gameState = {
-    currentNumber: null,
-    drawnNumbers: [],
-    isShowingAll: false
-};
+// Rotas públicas (Display e Assets)
+app.use(express.static(path.join(__dirname, 'public'), {
+    index: false // Desabilita index.html automático para controlar rotas
+}));
 
-// Função para obter IP da rede
-function getNetworkIP() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const interface of interfaces[name]) {
-            if (interface.family === 'IPv4' && !interface.internal) {
-                return interface.address;
-            }
-        }
-    }
-    return 'localhost';
-}
+// Rota raiz redireciona para display ou login? 
+// Vamos deixar o index.html público por enquanto, mas ele tem links pro admin.
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/display.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'display.html'));
+});
+
+// Rotas Protegidas (Admin)
+app.use('/admin.html', authMiddleware, express.static(path.join(__dirname, 'public', 'admin.html')));
 
 // Rotas da API
 app.get('/api/status', (req, res) => {
-    res.json(gameState);
+    res.json(gameState.get());
 });
 
 app.get('/api/network-info', (req, res) => {
     const networkIP = getNetworkIP();
     const port = PORT;
     const baseUrl = `http://${networkIP}:${port}`;
-    
+
     res.json({
         ip: networkIP,
         port: port,
@@ -57,7 +65,7 @@ app.get('/api/qr/:type', async (req, res) => {
         const networkIP = getNetworkIP();
         const port = PORT;
         const type = req.params.type;
-        
+
         let url;
         switch (type) {
             case 'admin':
@@ -69,7 +77,7 @@ app.get('/api/qr/:type', async (req, res) => {
             default:
                 url = `http://${networkIP}:${port}`;
         }
-        
+
         const qrCodeDataURL = await QRCode.toDataURL(url, {
             width: 300,
             margin: 2,
@@ -78,7 +86,7 @@ app.get('/api/qr/:type', async (req, res) => {
                 light: '#FFFFFF'
             }
         });
-        
+
         res.json({
             url: url,
             qrCode: qrCodeDataURL
@@ -88,79 +96,75 @@ app.get('/api/qr/:type', async (req, res) => {
     }
 });
 
-app.post('/api/draw-number', (req, res) => {
+// Rotas de Modificação de Estado (Protegidas)
+const apiAuthMiddleware = (req, res, next) => {
+    // Reutiliza a mesma auth ou verifica sessão. 
+    // Como o admin.html chama essas APIs via fetch, o browser envia as credenciais se estiver na mesma origem.
+    // Mas para garantir, podemos aplicar o auth aqui também.
+    authMiddleware(req, res, next);
+};
+
+app.post('/api/draw-number', apiAuthMiddleware, (req, res) => {
     const { number } = req.body;
-    
-    if (!number || number < 1 || number > 75) {
-        return res.status(400).json({ error: 'Número deve estar entre 1 e 75' });
+
+    try {
+        if (!number || number < 1 || number > 75) {
+            return res.status(400).json({ error: 'Número deve estar entre 1 e 75' });
+        }
+
+        const newState = gameState.drawNumber(number);
+
+        io.emit('numberDrawn', {
+            number: number,
+            total: newState.drawnNumbers.length,
+            drawnNumbers: newState.drawnNumbers
+        });
+
+        res.json({ success: true, number: number });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-    
-    if (gameState.drawnNumbers.includes(number)) {
-        return res.status(400).json({ error: 'Número já foi sorteado' });
-    }
-    
-    gameState.currentNumber = number;
-    gameState.drawnNumbers.push(number);
-    gameState.isShowingAll = false;
-    
-    // Notificar todos os clientes
-    io.emit('numberDrawn', {
-        number: number,
-        total: gameState.drawnNumbers.length,
-        drawnNumbers: gameState.drawnNumbers
-    });
-    
-    res.json({ success: true, number: number });
 });
 
-app.post('/api/show-last', (req, res) => {
-    gameState.isShowingAll = false;
-    
-    // Notificar todos os clientes para mostrar o último número
+app.post('/api/show-last', apiAuthMiddleware, (req, res) => {
+    const newState = gameState.setShowLast();
+
     io.emit('showLast', {
-        number: gameState.currentNumber,
-        drawnNumbers: gameState.drawnNumbers
+        number: newState.currentNumber,
+        drawnNumbers: newState.drawnNumbers
     });
-    
-    res.json({ success: true, number: gameState.currentNumber });
+
+    res.json({ success: true, number: newState.currentNumber });
 });
 
-app.post('/api/show-all', (req, res) => {
-    gameState.isShowingAll = true;
-    
-    // Notificar todos os clientes para mostrar todos os números
+app.post('/api/show-all', apiAuthMiddleware, (req, res) => {
+    const newState = gameState.setShowAll(true);
+
     io.emit('showAll', {
-        numbers: gameState.drawnNumbers.sort((a, b) => a - b)
+        numbers: newState.drawnNumbers.sort((a, b) => a - b)
     });
-    
-    res.json({ success: true, numbers: gameState.drawnNumbers });
+
+    res.json({ success: true, numbers: newState.drawnNumbers });
 });
 
-app.post('/api/reset', (req, res) => {
+app.post('/api/reset', apiAuthMiddleware, (req, res) => {
     console.log('Reset solicitado');
-    
-    gameState = {
-        currentNumber: null,
-        drawnNumbers: [],
-        isShowingAll: false
-    };
-    
-    console.log('Estado resetado:', gameState);
-    
-    // Notificar todos os clientes sobre o reset
+
+    const newState = gameState.reset();
+
+    console.log('Estado resetado');
     io.emit('gameReset');
-    console.log('Evento gameReset enviado para todos os clientes');
-    
+
     res.json({ success: true });
 });
 
 // WebSocket connection
 io.on('connection', (socket) => {
     console.log('Cliente conectado:', socket.id);
-    
+
     // Enviar estado atual para novo cliente
-    socket.emit('gameState', gameState);
-    
+    socket.emit('gameState', gameState.get());
+
     socket.on('disconnect', () => {
         console.log('Cliente desconectado:', socket.id);
     });
@@ -171,13 +175,9 @@ const HOST = '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
     const networkIP = getNetworkIP();
-    
+
     console.log(`🎯 Servidor do Bingo rodando na porta ${PORT}`);
-    console.log(`🌐 Servidor acessível em toda a rede!`);
-    console.log(`📱 IP da rede: ${networkIP}`);
+    console.log(`🔒 Admin protegido (user: admin, pass: ${ADMIN_PASSWORD})`);
     console.log(`🏠 Acesso local: http://localhost:${PORT}`);
     console.log(`🌍 Acesso em rede: http://${networkIP}:${PORT}`);
-    console.log(`🎮 Admin: http://${networkIP}:${PORT}/admin.html`);
-    console.log(`📺 Display: http://${networkIP}:${PORT}/display.html`);
-    console.log(`� QR Codes disponíveis na interface admin!`);
 });
