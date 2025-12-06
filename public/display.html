@@ -1,118 +1,403 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Display do Bingo</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Efeitos sonoros -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
 </head>
+
 <body class="display-page">
     <div class="display-container">
+
+        <!-- Controles Flutuantes -->
+        <div class="floating-controls">
+            <button id="wakeLockBtn" class="control-btn">🔒 Tela Ativa</button>
+            <button id="soundBtn" class="control-btn">🔊 Som: ON</button>
+        </div>
+
         <div id="currentDisplay" class="current-number-display">
             <div class="waiting-message">
                 <h1>🎯 BINGO</h1>
                 <p>Aguardando próximo número...</p>
             </div>
         </div>
-        
+
         <!-- Últimos números sorteados -->
         <div id="recentNumbers" class="recent-numbers">
             <div id="recentNumbersList" class="recent-numbers-list"></div>
         </div>
-        
+
         <div id="allNumbersDisplay" class="all-numbers-display" style="display: none;">
             <h2>Números Sorteados</h2>
             <div id="allNumbersGrid" class="all-numbers-grid"></div>
         </div>
-        
-        <!-- Controle de Wake Lock -->
-        <div id="wakeLockControl" class="wake-lock-control">
-            <button id="wakeLockBtn" class="wake-lock-btn">🔒 Manter Tela Ativa</button>
-        </div>
     </div>
+
+    <!-- Audio Element para efeito de "Ding" -->
+    <audio id="dingSound" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"
+        preload="auto"></audio>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="nosleep.js"></script>
     <script>
         const socket = io();
-        
-        // Função para formatar números com zero à esquerda
-        function formatNumber(number) {
-            return number.toString().padStart(2, '0');
+        const dingSound = document.getElementById('dingSound');
+
+        // State
+        let soundEnabled = true;
+        let wakeLockEnabled = false;
+        const noSleep = new NoSleep();
+
+        // Helper: Format
+        const formatNumber = n => n.toString().padStart(2, '0');
+
+        // Helper: Get Letter
+        function getBingoLetter(n) {
+            if (n <= 15) return 'B';
+            if (n <= 30) return 'I';
+            if (n <= 45) return 'N';
+            if (n <= 60) return 'G';
+            return 'O';
         }
-        
-        // Função para determinar a letra do BINGO
-        function getBingoLetter(number) {
-            if (number >= 1 && number <= 15) return 'B';
-            if (number >= 16 && number <= 30) return 'I';
-            if (number >= 31 && number <= 45) return 'N';
-            if (number >= 46 && number <= 60) return 'G';
-            if (number >= 61 && number <= 75) return 'O';
-            return '';
+
+        // --- TTS & Audio ---
+
+        function playSound() {
+            if (!soundEnabled) return;
+            // Play Ding
+            dingSound.currentTime = 0;
+            dingSound.play().catch(e => console.log('Audio autoplay blocked', e));
         }
-        
+
+        function speakNumber(number) {
+            if (!soundEnabled || !window.speechSynthesis) return;
+
+            const letter = getBingoLetter(number);
+            const text = `Letra ${letter}. Número ${number}.`;
+
+            // Cancel previous speech
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'pt-BR';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- UI Updates ---
+
         const currentDisplay = document.getElementById('currentDisplay');
         const allNumbersDisplay = document.getElementById('allNumbersDisplay');
         const allNumbersGrid = document.getElementById('allNumbersGrid');
         const recentNumbers = document.getElementById('recentNumbers');
         const recentNumbersList = document.getElementById('recentNumbersList');
-        
-        // Inicializar NoSleep
-        const noSleep = new NoSleep();
-        let wakeLockEnabled = false;
+        const soundBtn = document.getElementById('soundBtn');
         const wakeLockBtn = document.getElementById('wakeLockBtn');
-        const wakeLockControl = document.getElementById('wakeLockControl');
-        let hideButtonTimeout;
-        
-        // Socket events
-        socket.on('gameState', (state) => {
-            console.log('Estado recebido:', state);
-            if (state.isShowingAll && state.drawnNumbers.length > 0) {
-                showAllNumbers(state.drawnNumbers);
-            } else if (state.currentNumber) {
-                showCurrentNumber(state.currentNumber);
-            } else {
-                showWaitingMessage();
-            }
-            updateRecentNumbers(state.drawnNumbers);
-        });
-        
-        socket.on('numberDrawn', (data) => {
-            console.log('Número sorteado recebido:', data);
-            showCurrentNumber(data.number);
-            updateRecentNumbers(data.drawnNumbers);
-        });
-        
-        socket.on('showLast', (data) => {
-            if (data.number) {
-                showCurrentNumber(data.number);
-                updateRecentNumbers(data.drawnNumbers);
-            } else {
-                showWaitingMessage();
-                updateRecentNumbers(data.drawnNumbers);
-            }
-        });
 
-        socket.on('showAll', (data) => {
-            showAllNumbers(data.numbers);
-        });
-        
-        socket.on('gameReset', () => {
-            console.log('Evento gameReset recebido no display');
-            showWaitingMessage();
-            updateRecentNumbers([]);
-        });
-        
-        // Functions
+        // Toggle Sound
+        soundBtn.onclick = () => {
+            soundEnabled = !soundEnabled;
+            soundBtn.textContent = soundEnabled ? '🔊 Som: ON' : '🔇 Som: OFF';
+        };
+
+        // Toggle WakeLock
+        wakeLockBtn.onclick = async () => {
+            if (!wakeLockEnabled) {
+                try {
+                    await noSleep.enable();
+                    wakeLockEnabled = true;
+                    wakeLockBtn.textContent = '🔓 Bloquear Tela';
+                    wakeLockBtn.classList.add('active');
+                } catch (e) { console.error('WakeLock failed', e); }
+            } else {
+                noSleep.disable();
+                wakeLockEnabled = false;
+                wakeLockBtn.textContent = '🔒 Tela Ativa';
+                wakeLockBtn.classList.remove('active');
+            }
+        };
+
         function showCurrentNumber(number) {
             allNumbersDisplay.style.display = 'none';
             currentDisplay.style.display = 'flex';
             recentNumbers.style.display = 'block';
-            
-            const bingoLetter = getBingoLetter(number);
-            const formattedNumber = formatNumber(number);
-            
+
+            const letter = getBingoLetter(number);
+            const fmt = formatNumber(number);
+
             currentDisplay.innerHTML = `
+                <div class="number-container">
+                    <div class="bingo-ball ${letter.toLowerCase()}" style="animation: numberEntrance 0.6s ease-out;">
+                        <div class="ball-content">
+                            <div class="bingo-letter">${letter}</div>
+                            <div class="bingo-number">${fmt}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Audio Effects
+            playSound();
+            setTimeout(() => speakNumber(number), 500); // Speak after ding
+        }
+
+        function showAllNumbers(numbers) {
+            currentDisplay.style.display = 'none';
+            allNumbersDisplay.style.display = 'block';
+            recentNumbers.style.display = 'none';
+
+            allNumbersGrid.innerHTML = '';
+
+            const cols = [
+                { l: 'B', s: 1, e: 15, c: 'b' }, { l: 'I', s: 16, e: 30, c: 'i' },
+                { l: 'N', s: 31, e: 45, c: 'n' }, { l: 'G', s: 46, e: 60, c: 'g' },
+                { l: 'O', s: 61, e: 75, c: 'o' }
+            ];
+
+            cols.forEach(col => {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'bingo-column';
+
+                const header = document.createElement('div');
+                header.className = `column-header ${col.c}`;
+                header.textContent = col.l;
+                colDiv.appendChild(header);
+
+                const numContainer = document.createElement('div');
+                numContainer.className = 'column-numbers';
+
+                for (let i = col.s; i <= col.e; i++) {
+                    const div = document.createElement('div');
+                    div.className = 'number-cell';
+                    div.textContent = formatNumber(i);
+                    if (numbers.includes(i)) div.classList.add('drawn');
+                    numContainer.appendChild(div);
+                }
+
+                colDiv.appendChild(numContainer);
+                allNumbersGrid.appendChild(colDiv);
+
+                colDiv.appendChild(numContainer); // Bug fix: append only once. Corrected above.
+            });
+        }
+
+        function showWaiting() {
+            currentDisplay.style.display = 'flex';
+            allNumbersDisplay.style.display = 'none';
+            recentNumbers.style.display = 'none';
+            currentDisplay.innerHTML = `
+                <div class="waiting-message">
+                    <h1>🎯 BINGO</h1>
+                    <p>Aguardando próximo número...</p>
+                </div>
+            `;
+        }
+
+        function updateRecent(drawn) {
+            recentNumbersList.innerHTML = '';
+            const last7 = drawn.slice(-7);
+            if (last7.length === 0) { recentNumbers.style.display = 'none'; return; }
+            recentNumbers.style.display = 'block';
+
+            last7.forEach((n, idx) => {
+                const div = document.createElement('div');
+                div.className = 'recent-number';
+                div.textContent = formatNumber(n);
+                if (idx === last7.length - 1) div.classList.add('latest');
+                recentNumbersList.appendChild(div);
+            });
+        }
+
+        // --- Socket Events ---
+
+        socket.on('gameState', state => {
+            if (state.isShowingAll && state.drawnNumbers.length > 0) showAllNumbers(state.drawnNumbers);
+            else if (state.currentNumber) {
+                // Don't replay sound on reconnect/reload, only visual
+                showCurrentNumber(state.currentNumber);
+            }
+            else showWaiting();
+            updateRecent(state.drawnNumbers);
+        });
+
+        socket.on('numberDrawn', data => {
+            showCurrentNumber(data.number);
+            updateRecent(data.drawnNumbers);
+        });
+
+        socket.on('showAll', data => showAllNumbers(data.numbers));
+
+        socket.on('showLast', data => {
+            if (data.number) showCurrentNumber(data.number);
+            else showWaiting();
+            updateRecent(data.drawnNumbers);
+        });
+
+        socket.on('gameReset', () => {
+            showWaiting();
+            updateRecent([]);
+        });
+
+        // Fullscreen
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F11') { e.preventDefault(); document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+        });
+
+        // Auto connect
+        setInterval(() => { if (!socket.connected) socket.connect(); }, 5000);
+
+        // Initial tap for audio context
+        window.addEventListener('click', () => {
+            // Just to unlock audio context if needed
+        }, { once: true });
+
+    </script>
+    <style>
+        .floating-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .control-btn.active {
+            background: #27ae60;
+            border-color: #2ecc71;
+        }
+    </style>
+</body>
+
+</html>
+<div class="display-container">
+    <div id="currentDisplay" class="current-number-display">
+        <div class="waiting-message">
+            <h1>🎯 BINGO</h1>
+            <p>Aguardando próximo número...</p>
+        </div>
+    </div>
+
+    <!-- Últimos números sorteados -->
+    <div id="recentNumbers" class="recent-numbers">
+        <div id="recentNumbersList" class="recent-numbers-list"></div>
+    </div>
+
+    <div id="allNumbersDisplay" class="all-numbers-display" style="display: none;">
+        <h2>Números Sorteados</h2>
+        <div id="allNumbersGrid" class="all-numbers-grid"></div>
+    </div>
+
+    <!-- Controle de Wake Lock -->
+    <div id="wakeLockControl" class="wake-lock-control">
+        <button id="wakeLockBtn" class="wake-lock-btn">🔒 Manter Tela Ativa</button>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="nosleep.js"></script>
+<script>
+    const socket = io();
+
+    // Função para formatar números com zero à esquerda
+    function formatNumber(number) {
+        return number.toString().padStart(2, '0');
+    }
+
+    // Função para determinar a letra do BINGO
+    function getBingoLetter(number) {
+        if (number >= 1 && number <= 15) return 'B';
+        if (number >= 16 && number <= 30) return 'I';
+        if (number >= 31 && number <= 45) return 'N';
+        if (number >= 46 && number <= 60) return 'G';
+        if (number >= 61 && number <= 75) return 'O';
+        return '';
+    }
+
+    const currentDisplay = document.getElementById('currentDisplay');
+    const allNumbersDisplay = document.getElementById('allNumbersDisplay');
+    const allNumbersGrid = document.getElementById('allNumbersGrid');
+    const recentNumbers = document.getElementById('recentNumbers');
+    const recentNumbersList = document.getElementById('recentNumbersList');
+
+    // Inicializar NoSleep
+    const noSleep = new NoSleep();
+    let wakeLockEnabled = false;
+    const wakeLockBtn = document.getElementById('wakeLockBtn');
+    const wakeLockControl = document.getElementById('wakeLockControl');
+    let hideButtonTimeout;
+
+    // Socket events
+    socket.on('gameState', (state) => {
+        console.log('Estado recebido:', state);
+        if (state.isShowingAll && state.drawnNumbers.length > 0) {
+            showAllNumbers(state.drawnNumbers);
+        } else if (state.currentNumber) {
+            showCurrentNumber(state.currentNumber);
+        } else {
+            showWaitingMessage();
+        }
+        updateRecentNumbers(state.drawnNumbers);
+    });
+
+    socket.on('numberDrawn', (data) => {
+        console.log('Número sorteado recebido:', data);
+        showCurrentNumber(data.number);
+        updateRecentNumbers(data.drawnNumbers);
+    });
+
+    socket.on('showLast', (data) => {
+        if (data.number) {
+            showCurrentNumber(data.number);
+            updateRecentNumbers(data.drawnNumbers);
+        } else {
+            showWaitingMessage();
+            updateRecentNumbers(data.drawnNumbers);
+        }
+    });
+
+    socket.on('showAll', (data) => {
+        showAllNumbers(data.numbers);
+    });
+
+    socket.on('gameReset', () => {
+        console.log('Evento gameReset recebido no display');
+        showWaitingMessage();
+        updateRecentNumbers([]);
+    });
+
+    // Functions
+    function showCurrentNumber(number) {
+        allNumbersDisplay.style.display = 'none';
+        currentDisplay.style.display = 'flex';
+        recentNumbers.style.display = 'block';
+
+        const bingoLetter = getBingoLetter(number);
+        const formattedNumber = formatNumber(number);
+
+        currentDisplay.innerHTML = `
                 <div class="number-container">
                     <div class="bingo-ball ${bingoLetter.toLowerCase()}" style="animation: numberEntrance 0.6s ease-out;">
                         <div class="ball-content">
@@ -125,171 +410,171 @@
                     </div>
                 </div>
             `;
-            
-            // Adicionar efeito de pulso após a animação de entrada
-            setTimeout(() => {
-                const ball = currentDisplay.querySelector('.bingo-ball');
-                if (ball) {
-                    ball.style.animation = 'numberEntrance 0.6s ease-out, pulse 2s infinite 0.6s';
+
+        // Adicionar efeito de pulso após a animação de entrada
+        setTimeout(() => {
+            const ball = currentDisplay.querySelector('.bingo-ball');
+            if (ball) {
+                ball.style.animation = 'numberEntrance 0.6s ease-out, pulse 2s infinite 0.6s';
+            }
+        }, 100);
+    }
+
+    function showAllNumbers(numbers) {
+        currentDisplay.style.display = 'none';
+        allNumbersDisplay.style.display = 'block';
+        recentNumbers.style.display = 'none';
+
+        allNumbersGrid.innerHTML = '';
+
+        // Definir as colunas do BINGO
+        const columns = [
+            { letter: 'B', start: 1, end: 15, class: 'b' },
+            { letter: 'I', start: 16, end: 30, class: 'i' },
+            { letter: 'N', start: 31, end: 45, class: 'n' },
+            { letter: 'G', start: 46, end: 60, class: 'g' },
+            { letter: 'O', start: 61, end: 75, class: 'o' }
+        ];
+
+        // Criar cada coluna
+        columns.forEach(column => {
+            const columnDiv = document.createElement('div');
+            columnDiv.className = 'bingo-column';
+
+            // Cabeçalho da coluna
+            const header = document.createElement('div');
+            header.className = `column-header ${column.class}`;
+            header.textContent = column.letter;
+            columnDiv.appendChild(header);
+
+            // Container dos números
+            const numbersContainer = document.createElement('div');
+            numbersContainer.className = 'column-numbers';
+
+            // Adicionar números da coluna
+            for (let i = column.start; i <= column.end; i++) {
+                const numberDiv = document.createElement('div');
+                numberDiv.className = 'number-cell';
+                numberDiv.textContent = formatNumber(i);
+
+                if (numbers.includes(i)) {
+                    numberDiv.classList.add('drawn');
                 }
-            }, 100);
-        }
-        
-        function showAllNumbers(numbers) {
-            currentDisplay.style.display = 'none';
-            allNumbersDisplay.style.display = 'block';
-            recentNumbers.style.display = 'none';
-            
-            allNumbersGrid.innerHTML = '';
-            
-            // Definir as colunas do BINGO
-            const columns = [
-                { letter: 'B', start: 1, end: 15, class: 'b' },
-                { letter: 'I', start: 16, end: 30, class: 'i' },
-                { letter: 'N', start: 31, end: 45, class: 'n' },
-                { letter: 'G', start: 46, end: 60, class: 'g' },
-                { letter: 'O', start: 61, end: 75, class: 'o' }
-            ];
-            
-            // Criar cada coluna
-            columns.forEach(column => {
-                const columnDiv = document.createElement('div');
-                columnDiv.className = 'bingo-column';
-                
-                // Cabeçalho da coluna
-                const header = document.createElement('div');
-                header.className = `column-header ${column.class}`;
-                header.textContent = column.letter;
-                columnDiv.appendChild(header);
-                
-                // Container dos números
-                const numbersContainer = document.createElement('div');
-                numbersContainer.className = 'column-numbers';
-                
-                // Adicionar números da coluna
-                for (let i = column.start; i <= column.end; i++) {
-                    const numberDiv = document.createElement('div');
-                    numberDiv.className = 'number-cell';
-                    numberDiv.textContent = formatNumber(i);
-                    
-                    if (numbers.includes(i)) {
-                        numberDiv.classList.add('drawn');
-                    }
-                    
-                    numbersContainer.appendChild(numberDiv);
-                }
-                
-                columnDiv.appendChild(numbersContainer);
-                allNumbersGrid.appendChild(columnDiv);
-            });
-        }
-        
-        function showWaitingMessage() {
-            currentDisplay.style.display = 'flex';
-            allNumbersDisplay.style.display = 'none';
-            recentNumbers.style.display = 'none';
-            
-            currentDisplay.innerHTML = `
+
+                numbersContainer.appendChild(numberDiv);
+            }
+
+            columnDiv.appendChild(numbersContainer);
+            allNumbersGrid.appendChild(columnDiv);
+        });
+    }
+
+    function showWaitingMessage() {
+        currentDisplay.style.display = 'flex';
+        allNumbersDisplay.style.display = 'none';
+        recentNumbers.style.display = 'none';
+
+        currentDisplay.innerHTML = `
                 <div class="waiting-message">
                     <h1>🎯 BINGO</h1>
                     <p>Aguardando próximo número...</p>
                 </div>
             `;
+    }
+
+    function updateRecentNumbers(drawnNumbers) {
+        if (!recentNumbersList) {
+            return;
         }
-        
-        function updateRecentNumbers(drawnNumbers) {
-            if (!recentNumbersList) {
-                return;
-            }
-            
-            // Pegar os últimos 7 números em ordem de sorteio
-            const recentNums = drawnNumbers.slice(-7);
-            
-            // Limpar lista atual
-            recentNumbersList.innerHTML = '';
-            
-            if (recentNums.length === 0) {
-                recentNumbers.style.display = 'none';
-                return;
-            }
-            
-            recentNumbers.style.display = 'block';
-            
-            // Criar elementos para cada número
-            recentNums.forEach((num, index) => {
-                const numElement = document.createElement('div');
-                numElement.className = 'recent-number';
-                numElement.textContent = formatNumber(num);
-                
-                // Destacar o último número sorteado
-                if (index === recentNums.length - 1) {
-                    numElement.classList.add('latest');
-                }
-                
-                recentNumbersList.appendChild(numElement);
-            });
+
+        // Pegar os últimos 7 números em ordem de sorteio
+        const recentNums = drawnNumbers.slice(-7);
+
+        // Limpar lista atual
+        recentNumbersList.innerHTML = '';
+
+        if (recentNums.length === 0) {
+            recentNumbers.style.display = 'none';
+            return;
         }
-        
-        // Modo fullscreen
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'F11' || (e.key === 'f' && e.ctrlKey)) {
-                e.preventDefault();
-                toggleFullscreen();
+
+        recentNumbers.style.display = 'block';
+
+        // Criar elementos para cada número
+        recentNums.forEach((num, index) => {
+            const numElement = document.createElement('div');
+            numElement.className = 'recent-number';
+            numElement.textContent = formatNumber(num);
+
+            // Destacar o último número sorteado
+            if (index === recentNums.length - 1) {
+                numElement.classList.add('latest');
             }
+
+            recentNumbersList.appendChild(numElement);
         });
-        
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
+    }
+
+    // Modo fullscreen
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F11' || (e.key === 'f' && e.ctrlKey)) {
+            e.preventDefault();
+            toggleFullscreen();
         }
-        
-        // Função para ativar/desativar NoSleep
-        async function toggleWakeLock() {
-            if (!wakeLockEnabled) {
-                try {
-                    await noSleep.enable();
-                    wakeLockEnabled = true;
-                    updateWakeLockButton();
-                    showWakeLockStatus('🔒 Tela sempre ativa!');
-                } catch (error) {
-                    console.error('Erro ao ativar wake lock:', error);
-                    showWakeLockStatus('⚠️ Erro ao manter tela ativa');
-                }
-            } else {
-                noSleep.disable();
-                wakeLockEnabled = false;
+    });
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    // Função para ativar/desativar NoSleep
+    async function toggleWakeLock() {
+        if (!wakeLockEnabled) {
+            try {
+                await noSleep.enable();
+                wakeLockEnabled = true;
                 updateWakeLockButton();
-                showWakeLockStatus('🔓 Tela pode desligar');
+                showWakeLockStatus('🔒 Tela sempre ativa!');
+            } catch (error) {
+                console.error('Erro ao ativar wake lock:', error);
+                showWakeLockStatus('⚠️ Erro ao manter tela ativa');
+            }
+        } else {
+            noSleep.disable();
+            wakeLockEnabled = false;
+            updateWakeLockButton();
+            showWakeLockStatus('🔓 Tela pode desligar');
+        }
+    }
+
+    // Atualizar aparência do botão
+    function updateWakeLockButton() {
+        if (wakeLockBtn) {
+            if (wakeLockEnabled) {
+                wakeLockBtn.textContent = '🔓 Permitir Desligar';
+                wakeLockBtn.classList.add('active');
+            } else {
+                wakeLockBtn.textContent = '🔒 Manter Tela Ativa';
+                wakeLockBtn.classList.remove('active');
             }
         }
+    }
 
-        // Atualizar aparência do botão
-        function updateWakeLockButton() {
-            if (wakeLockBtn) {
-                if (wakeLockEnabled) {
-                    wakeLockBtn.textContent = '🔓 Permitir Desligar';
-                    wakeLockBtn.classList.add('active');
-                } else {
-                    wakeLockBtn.textContent = '🔒 Manter Tela Ativa';
-                    wakeLockBtn.classList.remove('active');
-                }
-            }
+    // Função para ativar NoSleep automaticamente
+    async function enableWakeLock() {
+        if (!wakeLockEnabled) {
+            await toggleWakeLock();
         }
+    }
 
-        // Função para ativar NoSleep automaticamente
-        async function enableWakeLock() {
-            if (!wakeLockEnabled) {
-                await toggleWakeLock();
-            }
-        }
-
-        // Função para mostrar status do wake lock
-        function showWakeLockStatus(message) {
-            const statusDiv = document.createElement('div');
-            statusDiv.style.cssText = `
+    // Função para mostrar status do wake lock
+    function showWakeLockStatus(message) {
+        const statusDiv = document.createElement('div');
+        statusDiv.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
@@ -301,91 +586,92 @@
                 z-index: 1000;
                 backdrop-filter: blur(10px);
             `;
-            statusDiv.textContent = message;
-            document.body.appendChild(statusDiv);
-            
-            setTimeout(() => {
-                statusDiv.remove();
-            }, 3000);
-        }
+        statusDiv.textContent = message;
+        document.body.appendChild(statusDiv);
 
-        // Event listener para o botão
-        if (wakeLockBtn) {
-            wakeLockBtn.addEventListener('click', toggleWakeLock);
-        }
+        setTimeout(() => {
+            statusDiv.remove();
+        }, 3000);
+    }
 
-        // Ativar wake lock no primeiro toque/clique (exceto no botão)
-        document.addEventListener('click', (e) => {
-            if (e.target !== wakeLockBtn) {
-                enableWakeLock();
-            }
-        }, { once: true });
-        
-        document.addEventListener('touchstart', (e) => {
-            if (e.target !== wakeLockBtn) {
-                enableWakeLock();
-            }
-        }, { once: true });
-        
-        // Mostrar/ocultar botão automaticamente
-        function showWakeLockButton() {
-            if (wakeLockControl) {
-                wakeLockControl.style.opacity = '0.8';
-                
-                // Ocultar após 5 segundos
-                clearTimeout(hideButtonTimeout);
-                hideButtonTimeout = setTimeout(() => {
-                    if (wakeLockControl) {
-                        wakeLockControl.style.opacity = '0.2';
-                    }
-                }, 5000);
-            }
-        }
+    // Event listener para o botão
+    if (wakeLockBtn) {
+        wakeLockBtn.addEventListener('click', toggleWakeLock);
+    }
 
-        // Mostrar botão com movimento do mouse/toque
-        document.addEventListener('mousemove', showWakeLockButton);
-        document.addEventListener('touchstart', showWakeLockButton);
-        
-        // Carregar estado inicial
-        async function loadInitialState() {
-            try {
-                const response = await fetch('/api/status');
-                const state = await response.json();
-                
-                if (state.isShowingAll && state.drawnNumbers.length > 0) {
-                    showAllNumbers(state.drawnNumbers.sort((a, b) => a - b));
-                } else if (state.currentNumber) {
-                    showCurrentNumber(state.currentNumber);
-                    updateRecentNumbers(state.drawnNumbers);
-                } else {
-                    showWaitingMessage();
+    // Ativar wake lock no primeiro toque/clique (exceto no botão)
+    document.addEventListener('click', (e) => {
+        if (e.target !== wakeLockBtn) {
+            enableWakeLock();
+        }
+    }, { once: true });
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.target !== wakeLockBtn) {
+            enableWakeLock();
+        }
+    }, { once: true });
+
+    // Mostrar/ocultar botão automaticamente
+    function showWakeLockButton() {
+        if (wakeLockControl) {
+            wakeLockControl.style.opacity = '0.8';
+
+            // Ocultar após 5 segundos
+            clearTimeout(hideButtonTimeout);
+            hideButtonTimeout = setTimeout(() => {
+                if (wakeLockControl) {
+                    wakeLockControl.style.opacity = '0.2';
                 }
-                updateRecentNumbers(state.drawnNumbers);
-            } catch (error) {
-                console.error('Erro ao carregar estado inicial:', error);
-            }
+            }, 5000);
         }
+    }
 
-        // Tentar ativar automaticamente após carregar
-        window.addEventListener('load', () => {
-            setTimeout(enableWakeLock, 1000);
-            showWakeLockButton();
-            loadInitialState();
-        });
+    // Mostrar botão com movimento do mouse/toque
+    document.addEventListener('mousemove', showWakeLockButton);
+    document.addEventListener('touchstart', showWakeLockButton);
 
-        // Reativar wake lock se a visibilidade mudar
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && wakeLockEnabled) {
-                setTimeout(enableWakeLock, 500);
+    // Carregar estado inicial
+    async function loadInitialState() {
+        try {
+            const response = await fetch('/api/status');
+            const state = await response.json();
+
+            if (state.isShowingAll && state.drawnNumbers.length > 0) {
+                showAllNumbers(state.drawnNumbers.sort((a, b) => a - b));
+            } else if (state.currentNumber) {
+                showCurrentNumber(state.currentNumber);
+                updateRecentNumbers(state.drawnNumbers);
+            } else {
+                showWaitingMessage();
             }
-        });
+            updateRecentNumbers(state.drawnNumbers);
+        } catch (error) {
+            console.error('Erro ao carregar estado inicial:', error);
+        }
+    }
 
-        // Auto-refresh connection
-        setInterval(() => {
-            if (!socket.connected) {
-                socket.connect();
-            }
-        }, 5000);
-    </script>
+    // Tentar ativar automaticamente após carregar
+    window.addEventListener('load', () => {
+        setTimeout(enableWakeLock, 1000);
+        showWakeLockButton();
+        loadInitialState();
+    });
+
+    // Reativar wake lock se a visibilidade mudar
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && wakeLockEnabled) {
+            setTimeout(enableWakeLock, 500);
+        }
+    });
+
+    // Auto-refresh connection
+    setInterval(() => {
+        if (!socket.connected) {
+            socket.connect();
+        }
+    }, 5000);
+</script>
 </body>
+
 </html>

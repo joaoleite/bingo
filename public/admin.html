@@ -5,8 +5,301 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle do Bingo</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body class="admin-page">
+    <div class="admin-container">
+        
+        <!-- Header com Preview -->
+        <div class="admin-header">
+            <div class="header-content">
+                <h1>🎮 Controle do Bingo</h1>
+                <div class="live-status">
+                    <span class="status-dot"></span> Online
+                </div>
+            </div>
+            
+            <div class="mini-preview" id="miniPreview">
+                <div class="preview-label">ÚLTIMO SORTEIO</div>
+                <div class="preview-ball-container">
+                    <div id="previewBall" class="preview-ball">
+                        <span id="previewLetter">-</span>
+                        <span id="previewNumber">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Área de Controle Principal -->
+        <div class="control-center">
+            
+            <!-- Coluna Esquerda: Sorteio -->
+            <div class="control-column main-action">
+                <h2>🎲 Sorteio</h2>
+                <div class="draw-controls">
+                    <div class="input-group-large">
+                        <input type="number" id="numberInput" min="1" max="75" placeholder="Nº">
+                        <button id="drawBtn" class="btn btn-primary btn-large">SORTEAR</button>
+                    </div>
+                    <button id="randomBtn" class="btn btn-success btn-block">🎲 Sortear Aleatório</button>
+                </div>
+            </div>
+            
+            <!-- Coluna Direita: Exibição -->
+            <div class="control-column display-action">
+                <h2>📺 Exibição</h2>
+                <div class="display-controls">
+                    <button id="showLastBtn" class="btn btn-info btn-block">Mostrar Último</button>
+                    <button id="showAllBtn" class="btn btn-secondary btn-block">Mostrar Todos</button>
+                    <hr class="separator">
+                    <button id="resetBtn" class="btn btn-danger btn-block">⚠️ Reiniciar Jogo</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status e Histórico -->
+        <div class="status-panel">
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-label">Total Sorteado</span>
+                    <span class="stat-value" id="totalNumbers">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Restantes</span>
+                    <span class="stat-value" id="remainingNumbers">75</span>
+                </div>
+            </div>
+            
+            <div class="drawn-numbers-container">
+                <h4>Histórico (Últimos primeiro)</h4>
+                <div id="drawnNumbersList" class="numbers-grid compact"></div>
+            </div>
+        </div>
+        
+        <!-- Painel de Rede (Colapsável) -->
+        <details class="network-panel-details">
+            <summary>🌐 Configurações de Rede e QR Codes</summary>
+            <div class="network-content">
+                <div class="network-info-grid">
+                    <p><strong>IP:</strong> <span id="networkIP">...</span></p>
+                    <p><strong>Admin:</strong> <a id="adminLink" href="#" target="_blank">Abrir</a></p>
+                    <p><strong>Display:</strong> <a id="displayLink" href="#" target="_blank">Abrir</a></p>
+                </div>
+                
+                <div class="qr-codes-compact">
+                    <div class="qr-item-compact">
+                        <span>Admin</span>
+                        <img id="qrAdmin" alt="QR Admin">
+                    </div>
+                    <div class="qr-item-compact">
+                        <span>Display</span>
+                        <img id="qrDisplay" alt="QR Display">
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Modal de Confirmação -->
+    <div id="confirmModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Confirmar Reset</h3>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja reiniciar o jogo?</p>
+                <p class="warning-text">Todo o histórico de números sorteados será apagado.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelModalBtn" class="btn btn-secondary">Cancelar</button>
+                <button id="confirmResetBtn" class="btn btn-danger">Sim, Reiniciar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // Elementos UI
+        const numberInput = document.getElementById('numberInput');
+        
+        // Preview Elements
+        const previewBall = document.getElementById('previewBall');
+        const previewLetter = document.getElementById('previewLetter');
+        const previewNumber = document.getElementById('previewNumber');
+        const miniPreview = document.getElementById('miniPreview');
+        
+        // Stats
+        const totalNumbers = document.getElementById('totalNumbers');
+        const remainingNumbers = document.getElementById('remainingNumbers');
+        const drawnNumbersList = document.getElementById('drawnNumbersList');
+        
+        // Modal
+        const confirmModal = document.getElementById('confirmModal');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const confirmResetBtn = document.getElementById('confirmResetBtn');
+        
+        // Network
+        const qrAdmin = document.getElementById('qrAdmin');
+        const qrDisplay = document.getElementById('qrDisplay');
+        const networkIP = document.getElementById('networkIP');
+        const adminLink = document.getElementById('adminLink');
+        const displayLink = document.getElementById('displayLink');
+
+        // Helper: Format Number
+        const formatNumber = n => n.toString().padStart(2, '0');
+        
+        // Helper: Get Bingo Letter
+        function getBingoLetter(n) {
+            if (n <= 15) return 'B';
+            if (n <= 30) return 'I';
+            if (n <= 45) return 'N';
+            if (n <= 60) return 'G';
+            return 'O';
+        }
+
+        // --- Core Functions ---
+
+        async function drawNumber() {
+            const val = parseInt(numberInput.value);
+            if (!val || val < 1 || val > 75) return showNotification('Número inválido!', 'error');
+            
+            try {
+                await fetch('/api/draw-number', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ number: val })
+                });
+                numberInput.value = '';
+                numberInput.focus();
+            } catch (e) {
+                showNotification(e.message, 'error');
+            }
+        }
+
+        async function drawRandom() {
+            const res = await fetch('/api/status');
+            const state = await res.json();
+            const available = [];
+            for(let i=1; i<=75; i++) if(!state.drawnNumbers.includes(i)) available.push(i);
+            
+            if(available.length === 0) return showNotification('Bingo finalizado!', 'error');
+            
+            const random = available[Math.floor(Math.random() * available.length)];
+            numberInput.value = random;
+            drawNumber();
+        }
+
+        // --- Event Listeners ---
+
+        document.getElementById('drawBtn').onclick = drawNumber;
+        document.getElementById('randomBtn').onclick = drawRandom;
+        
+        document.getElementById('showLastBtn').onclick = () => fetch('/api/show-last', { method: 'POST' });
+        document.getElementById('showAllBtn').onclick = () => fetch('/api/show-all', { method: 'POST' });
+        
+        // Reset Flow with Modal
+        document.getElementById('resetBtn').onclick = () => {
+            confirmModal.style.display = 'flex';
+        };
+        
+        cancelModalBtn.onclick = () => {
+            confirmModal.style.display = 'none';
+        };
+        
+        confirmResetBtn.onclick = async () => {
+            await fetch('/api/reset', { method: 'POST' });
+            confirmModal.style.display = 'none';
+        };
+
+        numberInput.addEventListener('keypress', e => {
+            if(e.key === 'Enter') drawNumber();
+        });
+
+        // --- UI Updates ---
+
+        function updateUI(state) {
+            totalNumbers.textContent = state.drawnNumbers.length;
+            remainingNumbers.textContent = 75 - state.drawnNumbers.length;
+            
+            // Update Preview Ball
+            if (state.currentNumber) {
+                const letter = getBingoLetter(state.currentNumber);
+                previewLetter.textContent = letter;
+                previewNumber.textContent = formatNumber(state.currentNumber);
+                
+                // Update class for color
+                previewBall.className = `preview-ball ${letter.toLowerCase()}`;
+                
+                miniPreview.classList.add('active');
+            } else {
+                miniPreview.classList.remove('active');
+                previewLetter.textContent = '-';
+                previewNumber.textContent = '-';
+                previewBall.className = 'preview-ball';
+            }
+
+            // Update List (Reversed for history style)
+            drawnNumbersList.innerHTML = '';
+            // Clone and reverse to show latest first
+            const reversed = [...state.drawnNumbers].reverse();
+            
+            reversed.forEach((num, index) => {
+                const div = document.createElement('div');
+                div.className = 'grid-number';
+                div.textContent = formatNumber(num);
+                // First element is the latest
+                if(index === 0) div.classList.add('latest');
+                drawnNumbersList.appendChild(div);
+            });
+        }
+
+        function showNotification(msg, type) {
+            const items = document.querySelectorAll('.notification');
+            items.forEach(i => i.remove());
+            
+            const div = document.createElement('div');
+            div.className = `notification ${type}`;
+            div.textContent = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        // --- Init ---
+
+        socket.on('gameState', updateUI);
+        socket.on('numberDrawn', data => {
+            showNotification(`Sorteado: ${data.number}`, 'success');
+        });
+        socket.on('gameReset', () => showNotification('Jogo Reiniciado!', 'success'));
+
+        // Config Init
+        (async () => {
+            // Load Initial State
+            const stateRes = await fetch('/api/status');
+            const state = await stateRes.json();
+            updateUI(state);
+
+            // Load Network
+            const netRes = await fetch('/api/network-info');
+            const net = await netRes.json();
+            networkIP.textContent = net.ip;
+            adminLink.href = net.adminUrl;
+            displayLink.href = net.displayUrl;
+
+            // Load QRs
+            const qrAdminRes = await fetch('/api/qr/admin');
+            const qrDisplayRes = await fetch('/api/qr/display');
+            const qrA = await qrAdminRes.json();
+            const qrD = await qrDisplayRes.json();
+            qrAdmin.src = qrA.qrCode;
+            qrDisplay.src = qrD.qrCode;
+        })();
+    </script>
+</body>
+</html>
     <div class="admin-container">
         <h1>🎮 Controle do Bingo</h1>
         
