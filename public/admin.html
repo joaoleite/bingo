@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +9,10 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
+
 <body class="admin-page">
     <div class="admin-container">
-        
+
         <!-- Header com Preview -->
         <div class="admin-header">
             <div class="header-content">
@@ -19,7 +21,7 @@
                     <span class="status-dot"></span> Online
                 </div>
             </div>
-            
+
             <div class="mini-preview" id="miniPreview">
                 <div class="preview-label">ÚLTIMO SORTEIO</div>
                 <div class="preview-ball-container">
@@ -30,10 +32,10 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Área de Controle Principal -->
         <div class="control-center">
-            
+
             <!-- Coluna Esquerda: Sorteio -->
             <div class="control-column main-action">
                 <h2>🎲 Sorteio</h2>
@@ -45,7 +47,7 @@
                     <button id="randomBtn" class="btn btn-success btn-block">🎲 Sortear Aleatório</button>
                 </div>
             </div>
-            
+
             <!-- Coluna Direita: Exibição -->
             <div class="control-column display-action">
                 <h2>📺 Exibição</h2>
@@ -57,7 +59,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Status e Histórico -->
         <div class="status-panel">
             <div class="stats-row">
@@ -70,13 +72,13 @@
                     <span class="stat-value" id="remainingNumbers">75</span>
                 </div>
             </div>
-            
+
             <div class="drawn-numbers-container">
                 <h4>Histórico (Últimos primeiro)</h4>
                 <div id="drawnNumbersList" class="numbers-grid compact"></div>
             </div>
         </div>
-        
+
         <!-- Painel de Rede (Colapsável) -->
         <details class="network-panel-details">
             <summary>🌐 Configurações de Rede e QR Codes</summary>
@@ -86,7 +88,7 @@
                     <p><strong>Admin:</strong> <a id="adminLink" href="#" target="_blank">Abrir</a></p>
                     <p><strong>Display:</strong> <a id="displayLink" href="#" target="_blank">Abrir</a></p>
                 </div>
-                
+
                 <div class="qr-codes-compact">
                     <div class="qr-item-compact">
                         <span>Admin</span>
@@ -121,26 +123,26 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
+
         // Elementos UI
         const numberInput = document.getElementById('numberInput');
-        
+
         // Preview Elements
         const previewBall = document.getElementById('previewBall');
         const previewLetter = document.getElementById('previewLetter');
         const previewNumber = document.getElementById('previewNumber');
         const miniPreview = document.getElementById('miniPreview');
-        
+
         // Stats
         const totalNumbers = document.getElementById('totalNumbers');
         const remainingNumbers = document.getElementById('remainingNumbers');
         const drawnNumbersList = document.getElementById('drawnNumbersList');
-        
+
         // Modal
         const confirmModal = document.getElementById('confirmModal');
         const cancelModalBtn = document.getElementById('cancelModalBtn');
         const confirmResetBtn = document.getElementById('confirmResetBtn');
-        
+
         // Network
         const qrAdmin = document.getElementById('qrAdmin');
         const qrDisplay = document.getElementById('qrDisplay');
@@ -150,7 +152,7 @@
 
         // Helper: Format Number
         const formatNumber = n => n.toString().padStart(2, '0');
-        
+
         // Helper: Get Bingo Letter
         function getBingoLetter(n) {
             if (n <= 15) return 'B';
@@ -165,11 +167,11 @@
         async function drawNumber() {
             const val = parseInt(numberInput.value);
             if (!val || val < 1 || val > 75) return showNotification('Número inválido!', 'error');
-            
+
             try {
                 await fetch('/api/draw-number', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ number: val })
                 });
                 numberInput.value = '';
@@ -183,10 +185,10 @@
             const res = await fetch('/api/status');
             const state = await res.json();
             const available = [];
-            for(let i=1; i<=75; i++) if(!state.drawnNumbers.includes(i)) available.push(i);
-            
-            if(available.length === 0) return showNotification('Bingo finalizado!', 'error');
-            
+            for (let i = 1; i <= 75; i++) if (!state.drawnNumbers.includes(i)) available.push(i);
+
+            if (available.length === 0) return showNotification('Bingo finalizado!', 'error');
+
             const random = available[Math.floor(Math.random() * available.length)];
             numberInput.value = random;
             drawNumber();
@@ -196,26 +198,26 @@
 
         document.getElementById('drawBtn').onclick = drawNumber;
         document.getElementById('randomBtn').onclick = drawRandom;
-        
+
         document.getElementById('showLastBtn').onclick = () => fetch('/api/show-last', { method: 'POST' });
         document.getElementById('showAllBtn').onclick = () => fetch('/api/show-all', { method: 'POST' });
-        
+
         // Reset Flow with Modal
         document.getElementById('resetBtn').onclick = () => {
             confirmModal.style.display = 'flex';
         };
-        
+
         cancelModalBtn.onclick = () => {
             confirmModal.style.display = 'none';
         };
-        
+
         confirmResetBtn.onclick = async () => {
             await fetch('/api/reset', { method: 'POST' });
             confirmModal.style.display = 'none';
         };
 
         numberInput.addEventListener('keypress', e => {
-            if(e.key === 'Enter') drawNumber();
+            if (e.key === 'Enter') drawNumber();
         });
 
         // --- UI Updates ---
@@ -223,16 +225,16 @@
         function updateUI(state) {
             totalNumbers.textContent = state.drawnNumbers.length;
             remainingNumbers.textContent = 75 - state.drawnNumbers.length;
-            
+
             // Update Preview Ball
             if (state.currentNumber) {
                 const letter = getBingoLetter(state.currentNumber);
                 previewLetter.textContent = letter;
                 previewNumber.textContent = formatNumber(state.currentNumber);
-                
+
                 // Update class for color
                 previewBall.className = `preview-ball ${letter.toLowerCase()}`;
-                
+
                 miniPreview.classList.add('active');
             } else {
                 miniPreview.classList.remove('active');
@@ -245,13 +247,13 @@
             drawnNumbersList.innerHTML = '';
             // Clone and reverse to show latest first
             const reversed = [...state.drawnNumbers].reverse();
-            
+
             reversed.forEach((num, index) => {
                 const div = document.createElement('div');
                 div.className = 'grid-number';
                 div.textContent = formatNumber(num);
                 // First element is the latest
-                if(index === 0) div.classList.add('latest');
+                if (index === 0) div.classList.add('latest');
                 drawnNumbersList.appendChild(div);
             });
         }
@@ -259,7 +261,7 @@
         function showNotification(msg, type) {
             const items = document.querySelectorAll('.notification');
             items.forEach(i => i.remove());
-            
+
             const div = document.createElement('div');
             div.className = `notification ${type}`;
             div.textContent = msg;
@@ -299,345 +301,5 @@
         })();
     </script>
 </body>
-</html>
-    <div class="admin-container">
-        <h1>🎮 Controle do Bingo</h1>
-        
-        <div class="control-panel">
-            <div class="input-section">
-                <label for="numberInput">Número sorteado (1-75):</label>
-                <div class="number-input-group">
-                    <input type="number" id="numberInput" min="1" max="75" placeholder="Digite o número">
-                    <button id="drawBtn" class="btn btn-primary">Sortear Número</button>
-                    <button id="randomBtn" class="btn btn-success">🎲 Sortear Aleatório</button>
-                </div>
-            </div>
-            
-            <div class="action-buttons">
-                <button id="showLastBtn" class="btn btn-primary">Mostrar Último Sorteio</button>
-                <button id="showAllBtn" class="btn btn-secondary">Mostrar Todos os Números</button>
-                <button id="resetBtn" class="btn btn-danger">Reiniciar Jogo</button>
-            </div>
-        </div>
-        
-        <div class="network-panel">
-            <h3>🌐 Informações da Rede</h3>
-            <div class="network-info">
-                <p><strong>IP da rede:</strong> <span id="networkIP">Carregando...</span></p>
-                <p><strong>URL Admin:</strong> <span id="adminUrl">Carregando...</span></p>
-                <p><strong>URL Display:</strong> <span id="displayUrl">Carregando...</span></p>
-            </div>
-            
-            <div class="qr-codes">
-                <h4>📱 QR Codes para Acesso Rápido</h4>
-                <div class="qr-container">
-                    <div class="qr-item">
-                        <h5>🎮 Admin</h5>
-                        <img id="qrAdmin" src="" alt="QR Admin" style="display: none;">
-                        <button id="loadQrAdmin" class="btn btn-outline">Gerar QR Admin</button>
-                    </div>
-                    <div class="qr-item">
-                        <h5>📺 Display</h5>
-                        <img id="qrDisplay" src="" alt="QR Display" style="display: none;">
-                        <button id="loadQrDisplay" class="btn btn-outline">Gerar QR Display</button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="status-panel">
-            <h3>Status do Jogo</h3>
-            <div class="current-info">
-                <p><strong>Último número:</strong> <span id="currentNumber">-</span></p>
-                <p><strong>Total sorteados:</strong> <span id="totalNumbers">0</span></p>
-            </div>
-            
-            <div class="drawn-numbers">
-                <h4>Números sorteados (em ordem):</h4>
-                <div id="drawnNumbersList" class="numbers-grid"></div>
-                <div class="numbers-summary">
-                    <p><strong>Sequência completa:</strong> <span id="numbersSequence">-</span></p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="links">
-            <a href="/" class="btn btn-outline">← Voltar ao Menu</a>
-            <a href="display.html" target="_blank" class="btn btn-outline">Abrir Display 📺</a>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        
-        // Função para formatar números com zero à esquerda
-        function formatNumber(number) {
-            return number.toString().padStart(2, '0');
-        }
-        
-        const numberInput = document.getElementById('numberInput');
-        const drawBtn = document.getElementById('drawBtn');
-        const randomBtn = document.getElementById('randomBtn');
-        const showLastBtn = document.getElementById('showLastBtn');
-        const showAllBtn = document.getElementById('showAllBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const currentNumber = document.getElementById('currentNumber');
-        const totalNumbers = document.getElementById('totalNumbers');
-        const drawnNumbersList = document.getElementById('drawnNumbersList');
-        const numbersSequence = document.getElementById('numbersSequence');
-        
-        // Elementos de rede
-        const networkIP = document.getElementById('networkIP');
-        const adminUrl = document.getElementById('adminUrl');
-        const displayUrl = document.getElementById('displayUrl');
-        const qrAdmin = document.getElementById('qrAdmin');
-        const qrDisplay = document.getElementById('qrDisplay');
-        const loadQrAdmin = document.getElementById('loadQrAdmin');
-        const loadQrDisplay = document.getElementById('loadQrDisplay');
-        
-        console.log('Elementos encontrados:', {
-            networkIP: !!networkIP,
-            adminUrl: !!adminUrl,
-            displayUrl: !!displayUrl,
-            qrAdmin: !!qrAdmin,
-            qrDisplay: !!qrDisplay,
-            loadQrAdmin: !!loadQrAdmin,
-            loadQrDisplay: !!loadQrDisplay
-        });
-        
-        // Event listeners
-        drawBtn.addEventListener('click', drawNumber);
-        randomBtn.addEventListener('click', drawRandomNumber);
-        showLastBtn.addEventListener('click', showLastNumber);
-        showAllBtn.addEventListener('click', showAllNumbers);
-        resetBtn.addEventListener('click', resetGame);
-        loadQrAdmin.addEventListener('click', () => loadQR('admin'));
-        loadQrDisplay.addEventListener('click', () => loadQR('display'));
-        
-        numberInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                drawNumber();
-            }
-        });
-        
-        // Socket events
-        socket.on('gameState', (state) => {
-            updateUI(state);
-        });
-        
-        socket.on('numberDrawn', (data) => {
-            showSuccess(`Número ${data.number} sorteado!`);
-            numberInput.value = '';
-        });
-        
-        socket.on('showLast', (data) => {
-            showSuccess('Mostrando último número sorteado!');
-        });
-
-        socket.on('showAll', (data) => {
-            showSuccess('Mostrando todos os números!');
-        });
-        
-        socket.on('gameReset', () => {
-            showSuccess('Jogo reiniciado!');
-        });
-        
-        // Functions
-        async function drawRandomNumber() {
-            // Pegar números já sorteados do estado atual
-            try {
-                const response = await fetch('/api/status');
-                const state = await response.json();
-                
-                // Criar array com todos os números de 1 a 75 que ainda não foram sorteados
-                const availableNumbers = [];
-                for (let i = 1; i <= 75; i++) {
-                    if (!state.drawnNumbers.includes(i)) {
-                        availableNumbers.push(i);
-                    }
-                }
-                
-                if (availableNumbers.length === 0) {
-                    showError('Todos os números já foram sorteados!');
-                    return;
-                }
-                
-                // Sortear um número aleatório dos disponíveis
-                const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-                const randomNumber = availableNumbers[randomIndex];
-                
-                // Preencher o input e sortear
-                numberInput.value = randomNumber;
-                await drawNumber();
-                
-            } catch (error) {
-                showError('Erro ao sortear número aleatório');
-            }
-        }
-
-        async function drawNumber() {
-            const number = parseInt(numberInput.value);
-            
-            if (!number || number < 1 || number > 75) {
-                showError('Digite um número válido entre 1 e 75');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/draw-number', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ number })
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    showError(data.error);
-                }
-            } catch (error) {
-                showError('Erro ao sortear número');
-            }
-        }
-        
-        async function showLastNumber() {
-            try {
-                await fetch('/api/show-last', { method: 'POST' });
-            } catch (error) {
-                showError('Erro ao mostrar último número');
-            }
-        }
-
-        async function showAllNumbers() {
-            try {
-                await fetch('/api/show-all', { method: 'POST' });
-            } catch (error) {
-                showError('Erro ao mostrar números');
-            }
-        }
-        
-        async function resetGame() {
-            if (confirm('Tem certeza que deseja reiniciar o jogo?')) {
-                try {
-                    console.log('Enviando reset request...');
-                    const response = await fetch('/api/reset', { method: 'POST' });
-                    const data = await response.json();
-                    console.log('Reset response:', data);
-                    
-                    if (response.ok) {
-                        showSuccess('Jogo reiniciado com sucesso!');
-                    } else {
-                        showError('Erro ao reiniciar jogo');
-                    }
-                } catch (error) {
-                    console.error('Erro no reset:', error);
-                    showError('Erro ao reiniciar jogo');
-                }
-            }
-        }
-        
-        function updateUI(state) {
-            currentNumber.textContent = state.currentNumber ? formatNumber(state.currentNumber) : '-';
-            totalNumbers.textContent = state.drawnNumbers.length;
-            
-            // Mostrar números em ordem de sorteio (não ordenados)
-            drawnNumbersList.innerHTML = '';
-            state.drawnNumbers.forEach((num, index) => {
-                const span = document.createElement('span');
-                span.className = 'drawn-number';
-                span.textContent = formatNumber(num);
-                
-                // Destacar o último número sorteado
-                if (index === state.drawnNumbers.length - 1 && state.drawnNumbers.length > 0) {
-                    span.classList.add('latest');
-                }
-                
-                drawnNumbersList.appendChild(span);
-            });
-            
-            // Mostrar sequência completa
-            if (numbersSequence) {
-                numbersSequence.textContent = state.drawnNumbers.length > 0 
-                    ? state.drawnNumbers.map(num => formatNumber(num)).join(' → ') 
-                    : '-';
-            }
-        }
-        
-        function showSuccess(message) {
-            showNotification(message, 'success');
-        }
-        
-        function showError(message) {
-            showNotification(message, 'error');
-        }
-        
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
-        }
-        
-        // Load network info
-        async function loadNetworkInfo() {
-            try {
-                console.log('Carregando informações da rede...');
-                const response = await fetch('/api/network-info');
-                const info = await response.json();
-                
-                console.log('Info da rede recebida:', info);
-                
-                if (networkIP) networkIP.textContent = info.ip;
-                if (adminUrl) adminUrl.textContent = info.adminUrl;
-                if (displayUrl) displayUrl.textContent = info.displayUrl;
-                
-                console.log('Informações da rede carregadas com sucesso');
-            } catch (error) {
-                console.error('Erro ao carregar info da rede:', error);
-            }
-        }
-        
-        // Load QR Code
-        async function loadQR(type) {
-            try {
-                console.log(`Gerando QR Code para ${type}...`);
-                const response = await fetch(`/api/qr/${type}`);
-                const data = await response.json();
-                
-                console.log(`QR Code ${type} gerado:`, data.url);
-                
-                if (type === 'admin') {
-                    if (qrAdmin && loadQrAdmin) {
-                        qrAdmin.src = data.qrCode;
-                        qrAdmin.style.display = 'block';
-                        loadQrAdmin.style.display = 'none';
-                    }
-                } else {
-                    if (qrDisplay && loadQrDisplay) {
-                        qrDisplay.src = data.qrCode;
-                        qrDisplay.style.display = 'block';
-                        loadQrDisplay.style.display = 'none';
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao gerar QR Code:', error);
-                showError('Erro ao gerar QR Code: ' + error.message);
-            }
-        }
-        
-        // Load initial state
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(state => updateUI(state));
-            
-        // Load network info
-        loadNetworkInfo();
-    </script>
-</body>
 </html>
