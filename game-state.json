@@ -1,0 +1,16 @@
+{
+  "salaA": {
+    "currentNumber": 5,
+    "drawnNumbers": [
+      5
+    ],
+    "isShowingAll": false,
+    "lastActivity": 1765063002054
+  },
+  "salaB": {
+    "currentNumber": null,
+    "drawnNumbers": [],
+    "isShowingAll": false,
+    "lastActivity": 1765062899311
+  }
+}

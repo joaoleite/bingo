@@ -47,6 +47,14 @@
         const socket = io();
         const dingSound = document.getElementById('dingSound');
 
+        // --- Room Logic ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentRoom = urlParams.get('room') || 'public';
+
+        socket.on('connect', () => {
+            socket.emit('joinRoom', currentRoom);
+        });
+
         // State
         let soundEnabled = true;
         let wakeLockEnabled = false;

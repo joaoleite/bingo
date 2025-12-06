@@ -124,6 +124,18 @@
     <script>
         const socket = io();
 
+        // --- Room Logic ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentRoom = urlParams.get('room') || 'public';
+
+        // Update Header
+        document.querySelector('h1').innerHTML = `🎮 Controle do Bingo <small style="font-size: 0.5em; opacity: 0.7">(${currentRoom})</small>`;
+
+        // Join Room
+        socket.on('connect', () => {
+            socket.emit('joinRoom', currentRoom);
+        });
+
         // Elementos UI
         const numberInput = document.getElementById('numberInput');
 
@@ -164,16 +176,34 @@
 
         // --- Core Functions ---
 
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            // Append Room to query for GET, Body for POST
+            let url = endpoint;
+
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+
+            if (method === 'GET') {
+                url += `?room=${currentRoom}`;
+            } else {
+                if (!body) body = {};
+                body.room = currentRoom;
+                options.body = JSON.stringify(body);
+            }
+
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error((await res.json()).error || 'Erro na requisição');
+            return await res.json();
+        }
+
         async function drawNumber() {
             const val = parseInt(numberInput.value);
             if (!val || val < 1 || val > 75) return showNotification('Número inválido!', 'error');
 
             try {
-                await fetch('/api/draw-number', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ number: val })
-                });
+                await apiCall('/api/draw-number', 'POST', { number: val });
                 numberInput.value = '';
                 numberInput.focus();
             } catch (e) {
@@ -182,16 +212,19 @@
         }
 
         async function drawRandom() {
-            const res = await fetch('/api/status');
-            const state = await res.json();
-            const available = [];
-            for (let i = 1; i <= 75; i++) if (!state.drawnNumbers.includes(i)) available.push(i);
+            try {
+                const state = await apiCall('/api/status');
+                const available = [];
+                for (let i = 1; i <= 75; i++) if (!state.drawnNumbers.includes(i)) available.push(i);
 
-            if (available.length === 0) return showNotification('Bingo finalizado!', 'error');
+                if (available.length === 0) return showNotification('Bingo finalizado!', 'error');
 
-            const random = available[Math.floor(Math.random() * available.length)];
-            numberInput.value = random;
-            drawNumber();
+                const random = available[Math.floor(Math.random() * available.length)];
+                numberInput.value = random;
+                drawNumber();
+            } catch (e) {
+                showNotification(e.message, 'error');
+            }
         }
 
         // --- Event Listeners ---
@@ -199,8 +232,8 @@
         document.getElementById('drawBtn').onclick = drawNumber;
         document.getElementById('randomBtn').onclick = drawRandom;
 
-        document.getElementById('showLastBtn').onclick = () => fetch('/api/show-last', { method: 'POST' });
-        document.getElementById('showAllBtn').onclick = () => fetch('/api/show-all', { method: 'POST' });
+        document.getElementById('showLastBtn').onclick = () => apiCall('/api/show-last', 'POST');
+        document.getElementById('showAllBtn').onclick = () => apiCall('/api/show-all', 'POST');
 
         // Reset Flow with Modal
         document.getElementById('resetBtn').onclick = () => {
@@ -212,7 +245,7 @@
         };
 
         confirmResetBtn.onclick = async () => {
-            await fetch('/api/reset', { method: 'POST' });
+            await apiCall('/api/reset', 'POST');
             confirmModal.style.display = 'none';
         };
 
@@ -280,22 +313,18 @@
         // Config Init
         (async () => {
             // Load Initial State
-            const stateRes = await fetch('/api/status');
-            const state = await stateRes.json();
+            const state = await apiCall('/api/status');
             updateUI(state);
 
             // Load Network
-            const netRes = await fetch('/api/network-info');
-            const net = await netRes.json();
+            const net = await apiCall('/api/network-info');
             networkIP.textContent = net.ip;
             adminLink.href = net.adminUrl;
             displayLink.href = net.displayUrl;
 
             // Load QRs
-            const qrAdminRes = await fetch('/api/qr/admin');
-            const qrDisplayRes = await fetch('/api/qr/display');
-            const qrA = await qrAdminRes.json();
-            const qrD = await qrDisplayRes.json();
+            const qrA = await apiCall('/api/qr/admin');
+            const qrD = await apiCall('/api/qr/display');
             qrAdmin.src = qrA.qrCode;
             qrDisplay.src = qrD.qrCode;
         })();

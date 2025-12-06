@@ -5,11 +5,7 @@ const STATE_FILE = path.join(__dirname, 'game-state.json');
 
 class GameState {
     constructor() {
-        this.state = {
-            currentNumber: null,
-            drawnNumbers: [],
-            isShowingAll: false
-        };
+        this.rooms = {}; // { roomName: { currentNumber, drawnNumbers, isShowingAll } }
         this.load();
     }
 
@@ -17,58 +13,82 @@ class GameState {
         try {
             if (fs.existsSync(STATE_FILE)) {
                 const data = fs.readFileSync(STATE_FILE, 'utf8');
-                this.state = JSON.parse(data);
-                console.log('Estado do jogo carregado do arquivo.');
+                this.rooms = JSON.parse(data);
+                console.log('Estados dos jogos carregados do arquivo.');
             }
         } catch (error) {
             console.error('Erro ao carregar estado:', error);
+            this.rooms = {};
         }
     }
 
     save() {
         try {
-            fs.writeFileSync(STATE_FILE, JSON.stringify(this.state, null, 2));
+            fs.writeFileSync(STATE_FILE, JSON.stringify(this.rooms, null, 2));
         } catch (error) {
             console.error('Erro ao salvar estado:', error);
         }
     }
 
-    get() {
-        return this.state;
+    // Helper to get or create room state
+    _getRoomState(roomName) {
+        if (!roomName) roomName = 'public'; // Default room
+
+        if (!this.rooms[roomName]) {
+            this.rooms[roomName] = {
+                currentNumber: null,
+                drawnNumbers: [],
+                isShowingAll: false,
+                lastActivity: Date.now()
+            };
+        }
+        return this.rooms[roomName];
     }
 
-    drawNumber(number) {
-        if (this.state.drawnNumbers.includes(number)) {
-            throw new Error('Número já foi sorteado');
+    get(roomName) {
+        return this._getRoomState(roomName);
+    }
+
+    drawNumber(roomName, number) {
+        const state = this._getRoomState(roomName);
+
+        if (state.drawnNumbers.includes(number)) {
+            throw new Error('Número já foi sorteado nesta sala');
         }
 
-        this.state.currentNumber = number;
-        this.state.drawnNumbers.push(number);
-        this.state.isShowingAll = false;
+        state.currentNumber = number;
+        state.drawnNumbers.push(number);
+        state.isShowingAll = false;
+        state.lastActivity = Date.now();
+
         this.save();
-        return this.state;
+        return state;
     }
 
-    reset() {
-        this.state = {
-            currentNumber: null,
-            drawnNumbers: [],
-            isShowingAll: false
-        };
+    reset(roomName) {
+        const state = this._getRoomState(roomName);
+
+        state.currentNumber = null;
+        state.drawnNumbers = [];
+        state.isShowingAll = false;
+        state.lastActivity = Date.now();
+
         this.save();
-        return this.state;
+        return state;
     }
 
-    setShowAll(show) {
-        this.state.isShowingAll = show;
+    setShowAll(roomName, show) {
+        const state = this._getRoomState(roomName);
+        state.isShowingAll = show;
         this.save();
-        return this.state;
+        return state;
     }
 
-    setShowLast() {
-        this.state.isShowingAll = false;
+    setShowLast(roomName) {
+        const state = this._getRoomState(roomName);
+        state.isShowingAll = false;
         this.save();
-        return this.state;
+        return state;
     }
 }
 
