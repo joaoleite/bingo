@@ -1,36 +1,65 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Bingo</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <h1>🎯 Sistema de Bingo</h1>
+
+        <div class="room-selector">
+            <label for="roomInput">Nome da Sala (Opcional)</label>
+            <input type="text" id="roomInput" placeholder="Ex: familia, festa, churrasco" value="public">
+        </div>
+
         <div class="menu">
             <div class="card">
                 <h2>🎮 Controle</h2>
                 <p>Interface para sortear números e controlar o jogo</p>
-                <a href="admin.html" class="btn btn-primary">Acessar Controle</a>
+                <button onclick="goTo('admin')" class="btn btn-primary btn-large btn-block">Acessar Controle</button>
             </div>
-            
+
             <div class="card">
                 <h2>📺 Display</h2>
                 <p>Tela de exibição para mostrar os números sorteados</p>
-                <a href="display.html" class="btn btn-secondary">Abrir Display</a>
+                <button onclick="goTo('display')" class="btn btn-secondary btn-large btn-block">Abrir Display</button>
             </div>
         </div>
-        
+
         <div class="instructions">
             <h3>Como usar:</h3>
             <ol>
-                <li><strong>Controle:</strong> Use para inserir os números sorteados manualmente</li>
-                <li><strong>Display:</strong> Deixe aberto na tela grande para mostrar ao público</li>
-                <li>Os números aparecem automaticamente no display quando sorteados</li>
+                <li><strong>Escolha uma Sala:</strong> Digite um nome para criar ou entrar em uma sala específica. Deixe
+                    "public" para jogar na sala padrão.</li>
+                <li><strong>Controle:</strong> Use para inserir os números sorteados manualmente.</li>
+                <li><strong>Display:</strong> Deixe aberto na tela grande. Os números aparecem automaticamente.</li>
             </ol>
         </div>
     </div>
+
+    <script>
+        function goTo(type) {
+            const roomInput = document.getElementById('roomInput');
+            let roomName = roomInput.value.trim();
+
+            // Default to 'public' if empty
+            if (!roomName) roomName = 'public';
+
+            // Encode URI component to handle special characters safely
+            const safeRoom = encodeURIComponent(roomName);
+
+            if (type === 'admin') {
+                window.location.href = `admin.html?room=${safeRoom}`;
+            } else {
+                window.location.href = `display.html?room=${safeRoom}`;
+            }
+        }
+    </script>
 </body>
+
 </html>
