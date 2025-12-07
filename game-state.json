@@ -12,5 +12,51 @@
     "drawnNumbers": [],
     "isShowingAll": false,
     "lastActivity": 1765062899311
+  },
+  "debug": {
+    "currentNumber": null,
+    "drawnNumbers": [],
+    "isShowingAll": false,
+    "lastActivity": 1765063505339
+  },
+  "public": {
+    "currentNumber": 47,
+    "drawnNumbers": [
+      62,
+      33,
+      11,
+      46,
+      12,
+      28,
+      24,
+      56,
+      27,
+      21,
+      66,
+      60,
+      16,
+      17,
+      32,
+      67,
+      37,
+      68,
+      1,
+      2,
+      18,
+      14,
+      73,
+      47
+    ],
+    "isShowingAll": false,
+    "lastActivity": 1765066445831
+  },
+  "QA": {
+    "currentNumber": 12,
+    "drawnNumbers": [
+      75,
+      12
+    ],
+    "isShowingAll": false,
+    "lastActivity": 1765064088894
   }
 }
