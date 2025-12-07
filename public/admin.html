@@ -327,21 +327,37 @@
 
         // Config Init
         (async () => {
-            // Load Initial State
-            const state = await apiCall('/api/status');
-            updateUI(state);
+            try {
+                // Load Initial State
+                const state = await apiCall('/api/status');
+                updateUI(state);
 
-            // Load Network
-            const net = await apiCall('/api/network-info');
-            networkIP.textContent = net.ip;
-            adminLink.href = net.adminUrl;
-            displayLink.href = net.displayUrl;
+                // Load Network
+                const net = await apiCall('/api/network-info');
+                if (networkIP) networkIP.textContent = net.ip;
 
-            // Load QRs
-            const qrA = await apiCall('/api/qr/admin');
-            const qrD = await apiCall('/api/qr/display');
-            qrAdmin.src = qrA.qrCode;
-            qrDisplay.src = qrD.qrCode;
+                // Update Links (Server already includes room param if needed)
+                if (adminLink) {
+                    adminLink.href = net.adminUrl;
+                    adminLink.textContent = "Abrir";
+                }
+                if (displayLink) {
+                    displayLink.href = net.displayUrl;
+                    displayLink.textContent = "Abrir";
+                }
+
+                // Load QRs
+                // Pass room explicitly if needed, but apiCall adds it to query
+                const qrA = await apiCall('/api/qr/admin');
+                const qrD = await apiCall('/api/qr/display');
+
+                if (qrAdmin && qrA.qrCode) qrAdmin.src = qrA.qrCode;
+                if (qrDisplay && qrD.qrCode) qrDisplay.src = qrD.qrCode;
+
+            } catch (err) {
+                console.error('Failed to load init config:', err);
+                showNotification('Erro ao carregar configurações de rede.', 'error');
+            }
         })();
     </script>
 </body>
