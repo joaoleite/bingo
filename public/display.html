@@ -240,78 +240,93 @@
             soundBtn.textContent = soundEnabled ? '🔊 Som: ON' : '🔇 Som: OFF';
         };
 
-        // --- Wake Lock Logic ---
+        // --- Wake Lock Logic (iOS-friendly) ---
         let wakeLockSent = null;
-        let wakeLockVideo = document.createElement('video');
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        let wakeLockErrorShown = false; // Prevent multiple alerts
 
-        // Setup Video Hack immediately
-        wakeLockVideo.setAttribute('playsinline', '');
-        wakeLockVideo.setAttribute('loop', '');
-        wakeLockVideo.setAttribute('muted', '');
-        // Minimal mp4 base64 (black screen)
-        wakeLockVideo.src = 'data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAACQG1kYXQAAAGzABAHAAABthADAQAAAAEA4CAdAAAAAhAAACAgAAAACAAAAP4BAAAAAAABAEAAAAQAQAAAAAABAAEAAAAAAQAQAAAAAAEAQAAAAAABAAQAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEA';
-        wakeLockVideo.style.position = 'absolute';
-        wakeLockVideo.style.top = '0';
-        wakeLockVideo.style.left = '0';
-        wakeLockVideo.style.width = '1px';
-        wakeLockVideo.style.height = '1px';
-        wakeLockVideo.style.opacity = '0.01';
-        wakeLockVideo.style.pointerEvents = 'none';
-        document.body.appendChild(wakeLockVideo);
-
-        function toggleWakeLock() {
+        async function toggleWakeLock() {
             if (!wakeLockEnabled) {
-                // ENABLE
-
-                // 1. Video Hack (Must be synchronous / immediate)
-                wakeLockVideo.play().then(() => {
-                    console.log('WakeLock Video Playing');
-                }).catch(e => {
-                    console.error('WakeLock Video Failed:', e);
-                    alert('Erro ao ativar Tela Ativa. Tente clicar novamente.');
-                });
-
-                // 2. Native API (Async is fine)
+                // ENABLE Wake Lock
                 if ('wakeLock' in navigator) {
-                    navigator.wakeLock.request('screen').then(lock => {
-                        wakeLockSent = lock;
+                    try {
+                        wakeLockSent = await navigator.wakeLock.request('screen');
+
                         wakeLockSent.addEventListener('release', () => {
-                            console.log('Native Wake Lock released');
+                            console.log('Wake Lock released');
                             wakeLockSent = null;
-                            if (wakeLockEnabled) toggleWakeLock(); // Try to re-engage
                         });
-                    }).catch(e => console.warn('Native WakeLock denied:', e));
+
+                        wakeLockEnabled = true;
+                        wakeLockBtn.textContent = '🔓 Bloquear Tela';
+                        wakeLockBtn.classList.add('active');
+                        wakeLockErrorShown = false;
+                        console.log('✅ Wake Lock ativado com sucesso');
+
+                    } catch (err) {
+                        console.error('Wake Lock falhou:', err);
+
+                        // Show error only once per session
+                        if (!wakeLockErrorShown) {
+                            wakeLockErrorShown = true;
+
+                            if (isIOS && err.name === 'NotAllowedError') {
+                                alert('Para manter a tela ativa no iPad/iPhone:\n\n' +
+                                    '• Desative o modo economia de energia\n' +
+                                    '• Certifique-se de que a bateria não está baixa\n' +
+                                    '• Acesse via HTTPS em produção');
+                            } else if (err.name === 'NotAllowedError') {
+                                alert('Permissão negada para manter a tela ativa.\n' +
+                                    'Tente tocar na tela novamente.');
+                            }
+                        }
+                    }
+                } else {
+                    // API not supported
+                    if (!wakeLockErrorShown) {
+                        wakeLockErrorShown = true;
+                        console.warn('Wake Lock API não suportada neste navegador');
+
+                        if (isIOS) {
+                            alert('Wake Lock requer iOS 16.4 ou superior.\n' +
+                                'Ajuste o tempo de bloqueio nas Configurações > Tela e Brilho.');
+                        } else {
+                            alert('Wake Lock não é suportado neste navegador.\n' +
+                                'A tela pode desligar normalmente.');
+                        }
+                    }
                 }
 
-                wakeLockEnabled = true;
-                wakeLockBtn.textContent = '🔓 Bloquear Tela';
-                wakeLockBtn.classList.add('active');
-
             } else {
-                // DISABLE
-                wakeLockVideo.pause();
+                // DISABLE Wake Lock
                 if (wakeLockSent) {
-                    wakeLockSent.release(); // release is promise but we don't care to wait
+                    try {
+                        await wakeLockSent.release();
+                    } catch (e) {
+                        console.log('Error releasing wake lock:', e);
+                    }
                     wakeLockSent = null;
                 }
 
                 wakeLockEnabled = false;
                 wakeLockBtn.textContent = '🔒 Tela Ativa';
                 wakeLockBtn.classList.remove('active');
+                console.log('Wake Lock desativado');
             }
         }
 
         wakeLockBtn.onclick = toggleWakeLock;
 
-        // Re-engage on visibility change
+        // Re-engage on visibility change (when tab becomes visible again)
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLockEnabled && document.visibilityState === 'visible') {
-                // Try to play again
-                wakeLockVideo.play().catch(e => console.log('Resume video failed', e));
-                if ('wakeLock' in navigator && !wakeLockSent) {
+            if (wakeLockEnabled && document.visibilityState === 'visible' && !wakeLockSent) {
+                if ('wakeLock' in navigator) {
                     try {
                         wakeLockSent = await navigator.wakeLock.request('screen');
-                    } catch (e) { }
+                        console.log('Wake Lock re-acquired after visibility change');
+                    } catch (e) {
+                        console.log('Failed to re-acquire wake lock:', e);
+                    }
                 }
             }
         });
