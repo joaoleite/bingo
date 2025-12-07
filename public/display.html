@@ -143,29 +143,61 @@
             const letter = getBingoLetter(number);
             const fmt = formatNumber(number);
 
-            currentDisplay.innerHTML = `
-                <div class="number-container">
-                    <div class="bingo-ball ${letter.toLowerCase()}" style="animation: numberEntrance 0.6s ease-out;">
-                        <div class="ball-content">
-                            <div class="bingo-letter">${letter}</div>
-                            <div class="bingo-number">${fmt}</div>
-                        </div>
-                    </div>
-                     <div class="number-info">
-                        <div class="number-label">NÚMERO SORTEADO</div>
+            // Find existing container or clear if it's the first time/waiting state
+            let container = currentDisplay.querySelector('.number-container');
+            if (!container) {
+                currentDisplay.innerHTML = ''; // Clear waiting message
+                container = document.createElement('div');
+                container.className = 'number-container';
+                container.innerHTML = `<div class="number-info"><div class="number-label">NÚMERO SORTEADO</div></div>`;
+                currentDisplay.appendChild(container);
+            }
+
+            // Handle Old Ball (Exit)
+            const oldBall = container.querySelector('.bingo-ball:not(.exiting)');
+            if (oldBall) {
+                oldBall.classList.add('exiting');
+                oldBall.style.position = 'absolute'; // Take out of flow
+                oldBall.style.animation = 'rollOut 0.8s ease-in forwards';
+
+                // Remove after animation
+                setTimeout(() => oldBall.remove(), 800);
+            }
+
+            // Create New Ball (Enter)
+            const newBallHTML = `
+                <div class="bingo-ball ${letter.toLowerCase()}" style="animation: rollIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                    <div class="ball-content">
+                        <div class="bingo-letter">${letter}</div>
+                        <div class="bingo-number">${fmt}</div>
                     </div>
                 </div>
             `;
 
-            // Pulse Effect
+            // Insert new ball before the label or just append to container
+            // We want the ball to be above the label visually, so let's prepend it or insert before label
+            // Actually, existing structure has label as a sibling.
+            // Let's create a temp wrapper for the ball to avoid layout shift when position absolute hits
+
+            // Create a temporary placeholder for the new ball
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newBallHTML;
+            const newBall = tempDiv.firstElementChild;
+
+            // Insert it before the number-info
+            const info = container.querySelector('.number-info');
+            container.insertBefore(newBall, info);
+
+            // Pulse Effect (starts after rollIn finishes)
             setTimeout(() => {
-                const ball = currentDisplay.querySelector('.bingo-ball');
-                if (ball) ball.style.animation = 'numberEntrance 0.6s ease-out, pulse 2s infinite 0.6s';
-            }, 100);
+                if (newBall && !newBall.classList.contains('exiting')) {
+                    newBall.style.animation = 'pulse 3s infinite ease-in-out';
+                }
+            }, 1000);
 
             // Audio Effects
             playSound();
-            setTimeout(() => speakNumber(number), 500); // Speak after ding
+            setTimeout(() => speakNumber(number), 500);
         }
 
         function showAllNumbers(numbers) {

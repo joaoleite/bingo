@@ -640,13 +640,15 @@ body {
 
 /* The Big Ball */
 .bingo-ball {
-    width: 40vh;
-    height: 40vh;
-    max-width: 400px;
-    max-height: 400px;
+    width: 60vh;
+    /* Increased from 40vh */
+    height: 60vh;
+    max-width: 600px;
+    /* Increased from 400px */
+    max-height: 600px;
     border-radius: 50%;
     background: white;
-    border: 10px solid rgba(255, 255, 255, 0.2);
+    border: 15px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 0 50px rgba(255, 255, 255, 0.1), inset -20px -20px 60px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
@@ -654,6 +656,8 @@ body {
     margin-bottom: 20px;
     color: white;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    will-change: transform;
+    /* Performance optimization for animation */
 }
 
 /* Ball Colors */
@@ -683,12 +687,12 @@ body {
 }
 
 .bingo-letter {
-    font-size: 3rem;
+    font-size: 5rem;
     opacity: 0.8;
 }
 
 .bingo-number {
-    font-size: 12rem;
+    font-size: 18rem;
     font-weight: bold;
     letter-spacing: -5px;
 }
@@ -701,19 +705,27 @@ body {
 }
 
 /* Animations */
-@keyframes numberEntrance {
+@keyframes rollIn {
     0% {
-        transform: scale(0) rotate(-180deg);
+        transform: translateX(-150%) rotate(-720deg);
         opacity: 0;
     }
 
-    60% {
-        transform: scale(1.1) rotate(10deg);
+    100% {
+        transform: translateX(0) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+@keyframes rollOut {
+    0% {
+        transform: translateX(0) rotate(0deg);
         opacity: 1;
     }
 
     100% {
-        transform: scale(1) rotate(0);
+        transform: translateX(150%) rotate(720deg);
+        opacity: 0;
     }
 }
 
