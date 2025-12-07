@@ -20,7 +20,7 @@
     "lastActivity": 1765063505339
   },
   "public": {
-    "currentNumber": 2,
+    "currentNumber": 14,
     "drawnNumbers": [
       32,
       16,
@@ -33,10 +33,19 @@
       26,
       47,
       70,
-      2
+      2,
+      52,
+      44,
+      62,
+      9,
+      58,
+      53,
+      1,
+      10,
+      14
     ],
     "isShowingAll": false,
-    "lastActivity": 1765087347297
+    "lastActivity": 1765091660082
   },
   "QA": {
     "currentNumber": 12,
@@ -147,5 +156,16 @@
     "drawnNumbers": [],
     "isShowingAll": false,
     "lastActivity": 1765085318513
+  },
+  "VisualVerify": {
+    "currentNumber": 26,
+    "drawnNumbers": [
+      59,
+      10,
+      29,
+      26
+    ],
+    "isShowingAll": false,
+    "lastActivity": 1765090169075
   }
 }
