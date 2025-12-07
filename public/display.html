@@ -59,7 +59,7 @@
         preload="auto"></audio>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="nosleep.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         const dingSound = document.getElementById('dingSound');
@@ -75,7 +75,6 @@
         // State
         let soundEnabled = true;
         let wakeLockEnabled = false;
-        const noSleep = new NoSleep();
 
         // UI Elements
         const currentDisplay = document.getElementById('currentDisplay');
@@ -241,22 +240,74 @@
             soundBtn.textContent = soundEnabled ? '🔊 Som: ON' : '🔇 Som: OFF';
         };
 
-        // Toggle WakeLock
-        wakeLockBtn.onclick = async () => {
-            if (!wakeLockEnabled) {
-                try {
-                    await noSleep.enable();
-                    wakeLockEnabled = true;
-                    wakeLockBtn.textContent = '🔓 Bloquear Tela';
-                    wakeLockBtn.classList.add('active');
-                } catch (e) { console.error('WakeLock failed', e); }
-            } else {
-                noSleep.disable();
-                wakeLockEnabled = false;
-                wakeLockBtn.textContent = '🔒 Tela Ativa';
-                wakeLockBtn.classList.remove('active');
+        // --- Wake Lock Logic ---
+        let wakeLockSent = null;
+        let wakeLockVideo = null;
+
+        async function enableWakeLock() {
+            // 1. Try Native Wake Lock API
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockSent = await navigator.wakeLock.request('screen');
+                    wakeLockSent.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                        wakeLockSent = null;
+                        if (wakeLockEnabled) enableWakeLock(); // Re-engage if supposed to be on
+                    });
+                }
+            } catch (err) {
+                console.warn('Native WakeLock failed:', err);
             }
+
+            // 2. iOS Video Hack (Always do this as fallback/parallel)
+            if (!wakeLockVideo) {
+                wakeLockVideo = document.createElement('video');
+                wakeLockVideo.setAttribute('playsinline', '');
+                wakeLockVideo.setAttribute('loop', '');
+                wakeLockVideo.setAttribute('muted', '');
+                // 1px transparent gif or mp4 base64?
+                // Minimal mp4 base64
+                wakeLockVideo.src = 'data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAACQG1kYXQAAAGzABAHAAABthADAQAAAAEA4CAdAAAAAhAAACAgAAAACAAAAP4BAAAAAAABAEAAAAQAQAAAAAABAAEAAAAAAQAQAAAAAAEAQAAAAAABAAQAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEAQAAAAAABAEAAAAAAQAEAAAAAAQABAAAAAAEA';
+                wakeLockVideo.style.width = '1px';
+                wakeLockVideo.style.height = '1px';
+                wakeLockVideo.style.opacity = '0.01';
+                document.body.appendChild(wakeLockVideo);
+            }
+            try {
+                await wakeLockVideo.play();
+            } catch (e) {
+                console.warn('Video fallback failed', e);
+            }
+
+            wakeLockEnabled = true;
+            wakeLockBtn.textContent = '🔓 Bloquear Tela';
+            wakeLockBtn.classList.add('active');
+        }
+
+        async function disableWakeLock() {
+            if (wakeLockSent) {
+                await wakeLockSent.release();
+                wakeLockSent = null;
+            }
+            if (wakeLockVideo) {
+                wakeLockVideo.pause();
+            }
+            wakeLockEnabled = false;
+            wakeLockBtn.textContent = '🔒 Tela Ativa';
+            wakeLockBtn.classList.remove('active');
+        }
+
+        wakeLockBtn.onclick = () => {
+            if (!wakeLockEnabled) enableWakeLock();
+            else disableWakeLock();
         };
+
+        // Re-engage on visibility change
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLockEnabled && document.visibilityState === 'visible') {
+                await enableWakeLock();
+            }
+        });
 
 
         function showCurrentNumber(number) {
