@@ -805,10 +805,14 @@ body {
 
 .column-header {
     text-align: center;
-    padding: 10px;
-    font-size: 2rem;
-    font-weight: bold;
+    padding: 20px;
+    /* Increased vertical space */
+    font-size: 3.5rem;
+    /* Much bigger text for "far away" reading */
+    font-weight: 900;
+    /* Extra bold */
     color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .column-header.b {
@@ -909,8 +913,9 @@ body {
     }
 
     .column-header {
-        font-size: 1rem;
-        padding: 5px;
+        font-size: 2rem;
+        /* Reasonable size for tablet */
+        padding: 10px;
     }
 
     /* THE CRITICAL GRID FIX */
@@ -952,4 +957,42 @@ body {
         z-index: 10;
         border: none;
     }
+}
+
+
+/* --- Color Coded Drawn Numbers (Global Override) --- */
+
+/* B - Red */
+.bingo-column:nth-child(1) .number-cell.drawn {
+    background: #c0392b !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(192, 57, 43, 0.6) !important;
+}
+
+/* I - Blue */
+.bingo-column:nth-child(2) .number-cell.drawn {
+    background: #2980b9 !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(41, 128, 185, 0.6) !important;
+}
+
+/* N - Green */
+.bingo-column:nth-child(3) .number-cell.drawn {
+    background: #27ae60 !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(39, 174, 96, 0.6) !important;
+}
+
+/* G - Orange */
+.bingo-column:nth-child(4) .number-cell.drawn {
+    background: #f39c12 !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(243, 156, 18, 0.6) !important;
+}
+
+/* O - Purple */
+.bingo-column:nth-child(5) .number-cell.drawn {
+    background: #8e44ad !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(142, 68, 173, 0.6) !important;
 }

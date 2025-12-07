@@ -222,6 +222,12 @@
         }
 
         function updateRecent(drawn) {
+            // If showing all numbers, ensure recent list is hidden and do nothing else
+            if (allNumbersDisplay.style.display !== 'none') {
+                recentNumbers.style.display = 'none';
+                return;
+            }
+
             recentNumbersList.innerHTML = '';
             const last7 = drawn.slice(-7);
             if (last7.length === 0) { recentNumbers.style.display = 'none'; return; }
