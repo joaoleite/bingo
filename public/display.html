@@ -114,22 +114,32 @@
             if (voices.length === 0) loadVoices();
 
             const letter = getBingoLetter(number);
-            const text = `Letra ${letter}. Número ${number}.`;
 
             // Cancel previous speech
             window.speechSynthesis.cancel();
 
-            const utterance = new SpeechSynthesisUtterance(text);
+            const utterance = new SpeechSynthesisUtterance();
 
             // Try to find a good PT-BR voice
-            const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+            // Specific preference list: Google, Microsoft, Apple, then any PT-BR
+            const ptVoice = voices.find(v => v.name.includes('Google Português')) ||
+                voices.find(v => v.name.includes('Luciana')) ||
+                voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+
             if (ptVoice) utterance.voice = ptVoice;
 
+            // "Coluna B (pause). Número 15"
+            // Using periods and commas to force rhythm
+            const text = `Coluna ${letter}. , Número ${number}.`;
+
+            utterance.text = text;
             utterance.lang = 'pt-BR';
-            utterance.rate = 1.0;
+            utterance.rate = 0.9; // Slightly slower for clarity
             utterance.pitch = 1.0;
 
             utterance.onerror = (e) => console.error('TTS Error:', e);
+
+            console.log('Speaking:', text, 'Voice:', ptVoice ? ptVoice.name : 'Default');
 
             window.speechSynthesis.speak(utterance);
         }
