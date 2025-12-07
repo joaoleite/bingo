@@ -148,8 +148,6 @@
         const miniPreview = document.getElementById('miniPreview');
 
         // Stats
-        const totalNumbers = document.getElementById('totalNumbers');
-        const remainingNumbers = document.getElementById('remainingNumbers');
         const drawnNumbersList = document.getElementById('drawnNumbersList');
 
         // Modal
@@ -177,19 +175,6 @@
         }
 
         // --- Core Functions ---
-
-        async function toggleDisplayMode(mode) {
-            try {
-                // Assuming 'auth' is defined elsewhere or not needed for this endpoint
-                await fetch(`/api/toggle-display?mode=${mode}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, // Removed 'Authorization': auth
-                    body: JSON.stringify({ room: currentRoom })
-                });
-            } catch (e) {
-                console.error('Error toggling display:', e);
-            }
-        }
 
         async function apiCall(endpoint, method = 'GET', body = null) {
             // Append Room to query for GET, Body for POST

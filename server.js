@@ -4,6 +4,7 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
 const basicAuth = require('express-basic-auth');
+const rateLimit = require('express-rate-limit');
 const qr = require('qrcode');
 const utils = require('./utils');
 const gameState = require('./gameState');
@@ -15,6 +16,22 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'bingo2024';
 // Middleware para parsear JSON
 app.use(express.json());
 
+// Rate Limiting - Proteção contra ataques
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // máximo de 100 requisições por IP
+    message: { error: 'Muitas requisições, tente novamente mais tarde.' }
+});
+
+const strictLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 30, // máximo de 30 requisições por minuto
+    message: { error: 'Limite de sorteios excedido, aguarde um momento.' }
+});
+
+// Aplicar rate limiting em todas as rotas da API
+app.use('/api/', apiLimiter);
+
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -25,8 +42,11 @@ const authMiddleware = basicAuth({
     realm: 'BingoAdmin'
 });
 
-// Helper para obter sala da Request
-const getRoom = (req) => req.query.room || req.body.room || 'public';
+// Helper para obter e sanitizar sala da Request
+const getRoom = (req) => {
+    const room = req.query.room || req.body.room || 'public';
+    return utils.sanitizeRoomName(room);
+};
 
 // --- Rotas da API ---
 
@@ -79,15 +99,22 @@ app.get('/api/qr/display', async (req, res) => {
 // --- Rotas Protegidas ---
 
 // Sortear número
-app.post('/api/draw-number', authMiddleware, (req, res) => {
+app.post('/api/draw-number', authMiddleware, strictLimiter, (req, res) => {
     const { number, room: bodyRoom } = req.body;
-    const room = bodyRoom || req.query.room || 'public';
+    const room = utils.sanitizeRoomName(bodyRoom || req.query.room || 'public');
 
-    if (!number) return res.status(400).json({ error: 'Número é obrigatório' });
+    // Validar número
+    if (!number) {
+        return res.status(400).json({ error: 'Número é obrigatório' });
+    }
+
+    if (!utils.validateBingoNumber(number)) {
+        return res.status(400).json({ error: 'Número deve estar entre 1 e 75' });
+    }
 
     try {
-        const newState = gameState.drawNumber(room, number);
-        io.to(room).emit('numberDrawn', { number, drawnNumbers: newState.drawnNumbers });
+        const newState = gameState.drawNumber(room, parseInt(number));
+        io.to(room).emit('numberDrawn', { number: parseInt(number), drawnNumbers: newState.drawnNumbers });
         io.to(room).emit('gameState', newState);
         res.json(newState);
     } catch (error) {

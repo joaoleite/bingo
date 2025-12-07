@@ -92,6 +92,20 @@ class GameState {
         return state;
     }
 
+    toggleDisplayMode(roomName, mode) {
+        const state = this._getRoomState(roomName);
+        if (mode === 'all') {
+            state.isShowingAll = true;
+        } else if (mode === 'current') {
+            state.isShowingAll = false;
+        } else {
+            // Toggle if no explicit mode
+            state.isShowingAll = !state.isShowingAll;
+        }
+        this.save();
+        return state;
+    }
+
     setShowLast(roomName) {
         const state = this._getRoomState(roomName);
         state.isShowingAll = false;
