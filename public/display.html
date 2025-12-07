@@ -129,16 +129,35 @@
 
             const savedVoice = localStorage.getItem('bingoVoiceURI');
 
-            voiceList.innerHTML = ptVoices.map(v => `
-                <div style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center;">
+            voiceList.innerHTML = ptVoices.map(v => {
+                const isSelected = v.voiceURI === savedVoice;
+                return `
+                <div style="
+                    margin-bottom: 10px; 
+                    padding: 12px; 
+                    background: ${isSelected ? 'rgba(46, 204, 113, 0.2)' : 'rgba(255,255,255,0.1)'}; 
+                    border: ${isSelected ? '2px solid #2ecc71' : '1px solid rgba(255,255,255,0.2)'};
+                    border-radius: 8px; 
+                    display: flex; 
+                    align-items: center;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                " onclick="document.getElementById('${v.voiceURI}').click()">
                     <input type="radio" name="voiceGroup" value="${v.voiceURI}" id="${v.voiceURI}" 
-                        ${v.voiceURI === savedVoice ? 'checked' : ''} 
-                        onchange="saveVoice('${v.voiceURI}')">
-                    <label for="${v.voiceURI}" style="margin-left: 10px; cursor: pointer; flex: 1;">
+                        ${isSelected ? 'checked' : ''} 
+                        onchange="saveVoice('${v.voiceURI}')"
+                        style="transform: scale(1.5); margin-right: 15px; accent-color: #2ecc71;">
+                    <label for="${v.voiceURI}" style="
+                        cursor: pointer; 
+                        flex: 1; 
+                        color: white; 
+                        font-size: 1.2rem; 
+                        font-weight: ${isSelected ? 'bold' : 'normal'};
+                    ">
                         ${v.name}
                     </label>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         window.saveVoice = (uri) => {
