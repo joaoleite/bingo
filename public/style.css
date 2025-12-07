@@ -561,6 +561,9 @@ body {
     outline: none;
 }
 
+/* Mobile Display Page Optimization */
+
+
 
 /* --- Display Page --- */
 .display-page {
@@ -853,4 +856,100 @@ body {
     color: #333;
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Mobile/Tablet Display Page Optimization */
+@media (max-width: 1366px) {
+
+    /* Main Screen squashing */
+    .waiting-message h1 {
+        font-size: 3rem;
+    }
+
+    .waiting-message p {
+        font-size: 1rem;
+    }
+
+    .bingo-ball {
+        width: 280px;
+        height: 280px;
+        border-width: 5px;
+    }
+
+    .bingo-letter {
+        font-size: 2rem;
+    }
+
+    .bingo-number {
+        font-size: 8rem;
+    }
+
+    /* Show All Grid - Mobile */
+    .all-numbers-display {
+        padding-top: 10px;
+        height: auto;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .all-numbers-display h2 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+    }
+
+    .all-numbers-grid {
+        /* Force 5 columns */
+        grid-template-columns: repeat(5, 1fr);
+        gap: 5px;
+        align-content: start;
+    }
+
+    .bingo-column {
+        border-radius: 6px;
+    }
+
+    .column-header {
+        font-size: 1rem;
+        padding: 5px;
+    }
+
+    /* THE CRITICAL GRID FIX */
+    .column-numbers {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        padding: 5px;
+        gap: 6px;
+        /* A bit more breathing room */
+        align-content: start;
+    }
+
+    .number-cell {
+        font-size: 1.4rem;
+        /* Much Bigger */
+        padding: 12px 0;
+        height: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.15);
+        /* More visible cell bg */
+        color: rgba(255, 255, 255, 0.9);
+        /* High contrast text (almost white) */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Subtle definition */
+        border-radius: 8px;
+        /* Softer look */
+        font-weight: bold;
+    }
+
+    .number-cell.drawn {
+        font-size: 1.5rem;
+        background: #fff;
+        color: #000;
+        font-weight: 900;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+        transform: scale(1.05);
+        z-index: 10;
+        border: none;
+    }
 }
