@@ -336,9 +336,19 @@
         // Auto connect
         setInterval(() => { if (!socket.connected) socket.connect(); }, 5000);
 
-        // Initial tap for audio context
+        // Initial tap for audio context & TTS Warmup
+        function warmUpTTS() {
+            if (!window.speechSynthesis) return;
+            // Speak a silent space to wake up the engine
+            const u = new SpeechSynthesisUtterance(' ');
+            u.volume = 0;
+            window.speechSynthesis.speak(u);
+            console.log('TTS Engine Warmed Up');
+        }
+
         window.addEventListener('click', () => {
             // Just to unlock audio context if needed
+            warmUpTTS();
         }, { once: true });
 
     </script>
