@@ -148,8 +148,8 @@
         const miniPreview = document.getElementById('miniPreview');
 
         // Stats
-        const totalNumbers = document.getElementById('totalNumbers');
-        const remainingNumbers = document.getElementById('remainingNumbers');
+        const drawnCount = document.getElementById('drawnCount');
+        const remainingCount = document.getElementById('remainingCount');
         const drawnNumbersList = document.getElementById('drawnNumbersList');
 
         // Modal
@@ -271,8 +271,8 @@
         // --- UI Updates ---
 
         function updateUI(state) {
-            totalNumbers.textContent = state.drawnNumbers.length;
-            remainingNumbers.textContent = 75 - state.drawnNumbers.length;
+            drawnCount.textContent = state.drawnNumbers.length;
+            remainingCount.textContent = 75 - state.drawnNumbers.length;
 
             // Update Preview Ball
             if (state.currentNumber) {

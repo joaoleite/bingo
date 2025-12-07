@@ -240,94 +240,58 @@
             soundBtn.textContent = soundEnabled ? '🔊 Som: ON' : '🔇 Som: OFF';
         };
 
-        // --- Wake Lock Logic (iOS-friendly) ---
-        let wakeLockSent = null;
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        let wakeLockErrorShown = false; // Prevent multiple alerts
+        // --- Wake Lock Logic (Video-based for iOS compatibility) ---
+        let wakeLockVideo = null;
 
-        async function toggleWakeLock() {
+        // Create and setup the wake lock video element
+        function setupWakeLockVideo() {
+            wakeLockVideo = document.createElement('video');
+            wakeLockVideo.setAttribute('playsinline', '');
+            wakeLockVideo.setAttribute('loop', '');
+            wakeLockVideo.muted = true;
+
+            // Small silent video - just a black frame repeated
+            // This is the most reliable method for iOS/iPad
+            wakeLockVideo.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAu1tZGF0AAACrQYF//+p3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1MiByMjg1NCBlOWE1OTAzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTMgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAASWWIhAAv//72rvzLK0cLlS4dWXuzUfLoSXL9iDB9aAAAAwAAAwAAD/DNvp6j0h7AOAABAAAAGQGeBGxC/wAAAMAAByFewAD1NoACAAAAABBBmiRsQ/8AAADAAAMAAA+hAAAAEEGaQjxBf0AAAAMAAAMA+gAAABBBmmI8QX9AAAADAAADAA+gAAAAEEGagXxBf0AAAAMAAAMA+gAAABFBmqBsQZ8AAADAAAMAAA+hAAAAEUGawGxBnwAAAMAAAwAPoQAAABBBmuFJqEFsmwAAAMAAAwD6AAAAEEGbAEnf8AAAAMAAAMA+gAAAARRBmyBJ3/AAAAMAAAMA';
+
+            wakeLockVideo.style.cssText = 'position:fixed;top:-1px;left:-1px;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;';
+            document.body.appendChild(wakeLockVideo);
+        }
+
+        // Initialize video on first load
+        setupWakeLockVideo();
+
+        function toggleWakeLock() {
             if (!wakeLockEnabled) {
-                // ENABLE Wake Lock
-                if ('wakeLock' in navigator) {
-                    try {
-                        wakeLockSent = await navigator.wakeLock.request('screen');
-
-                        wakeLockSent.addEventListener('release', () => {
-                            console.log('Wake Lock released');
-                            wakeLockSent = null;
-                        });
-
+                // ENABLE - Play video to keep screen awake
+                wakeLockVideo.play()
+                    .then(() => {
                         wakeLockEnabled = true;
-                        wakeLockBtn.textContent = '🔓 Bloquear Tela';
+                        wakeLockBtn.textContent = '🔓 Tela Ativa';
                         wakeLockBtn.classList.add('active');
-                        wakeLockErrorShown = false;
-                        console.log('✅ Wake Lock ativado com sucesso');
-
-                    } catch (err) {
-                        console.error('Wake Lock falhou:', err);
-
-                        // Show error only once per session
-                        if (!wakeLockErrorShown) {
-                            wakeLockErrorShown = true;
-
-                            if (isIOS && err.name === 'NotAllowedError') {
-                                alert('Para manter a tela ativa no iPad/iPhone:\n\n' +
-                                    '• Desative o modo economia de energia\n' +
-                                    '• Certifique-se de que a bateria não está baixa\n' +
-                                    '• Acesse via HTTPS em produção');
-                            } else if (err.name === 'NotAllowedError') {
-                                alert('Permissão negada para manter a tela ativa.\n' +
-                                    'Tente tocar na tela novamente.');
-                            }
-                        }
-                    }
-                } else {
-                    // API not supported
-                    if (!wakeLockErrorShown) {
-                        wakeLockErrorShown = true;
-                        console.warn('Wake Lock API não suportada neste navegador');
-
-                        if (isIOS) {
-                            alert('Wake Lock requer iOS 16.4 ou superior.\n' +
-                                'Ajuste o tempo de bloqueio nas Configurações > Tela e Brilho.');
-                        } else {
-                            alert('Wake Lock não é suportado neste navegador.\n' +
-                                'A tela pode desligar normalmente.');
-                        }
-                    }
-                }
-
+                        console.log('✅ Tela Ativa ativada (video method)');
+                    })
+                    .catch(err => {
+                        console.error('Erro ao ativar Tela Ativa:', err);
+                        // On iOS, sometimes you need a second tap
+                        alert('Toque novamente para ativar a Tela Ativa.');
+                    });
             } else {
-                // DISABLE Wake Lock
-                if (wakeLockSent) {
-                    try {
-                        await wakeLockSent.release();
-                    } catch (e) {
-                        console.log('Error releasing wake lock:', e);
-                    }
-                    wakeLockSent = null;
-                }
-
+                // DISABLE - Pause video
+                wakeLockVideo.pause();
                 wakeLockEnabled = false;
                 wakeLockBtn.textContent = '🔒 Tela Ativa';
                 wakeLockBtn.classList.remove('active');
-                console.log('Wake Lock desativado');
+                console.log('Tela Ativa desativada');
             }
         }
 
         wakeLockBtn.onclick = toggleWakeLock;
 
         // Re-engage on visibility change (when tab becomes visible again)
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLockEnabled && document.visibilityState === 'visible' && !wakeLockSent) {
-                if ('wakeLock' in navigator) {
-                    try {
-                        wakeLockSent = await navigator.wakeLock.request('screen');
-                        console.log('Wake Lock re-acquired after visibility change');
-                    } catch (e) {
-                        console.log('Failed to re-acquire wake lock:', e);
-                    }
-                }
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLockEnabled && document.visibilityState === 'visible') {
+                wakeLockVideo.play().catch(e => console.log('Auto-resume failed:', e));
             }
         });
 
