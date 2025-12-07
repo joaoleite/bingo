@@ -17,7 +17,6 @@
         <div class="floating-controls">
             <button id="wakeLockBtn" class="control-btn">🔒 Tela Ativa</button>
             <button id="soundBtn" class="control-btn">🔊 Som: ON</button>
-            <button id="debugVoiceBtn" class="control-btn" style="background:#e67e22;">❓ Vozes</button>
         </div>
 
         <div id="currentDisplay" class="current-number-display">
@@ -180,13 +179,6 @@
             }
         };
 
-        // Debug Voices Button
-        document.getElementById('debugVoiceBtn').onclick = () => {
-            if (voices.length === 0) loadVoices();
-            const ptVoices = voices.filter(v => v.lang.includes('pt'));
-            const names = ptVoices.map(v => v.name).join('\n');
-            alert(`Vozes PT encontradas:\n${names || 'Nenhuma (Verifique Ajustes > Acessibilidade)'}`);
-        };
 
         function showCurrentNumber(number) {
             allNumbersDisplay.style.display = 'none';
