@@ -17,6 +17,7 @@
         <div class="floating-controls">
             <button id="wakeLockBtn" class="control-btn">🔒 Tela Ativa</button>
             <button id="soundBtn" class="control-btn">🔊 Som: ON</button>
+            <button id="voiceSettingsBtn" class="control-btn" style="background:#8e44ad;">🗣 Voz</button>
         </div>
 
         <div id="currentDisplay" class="current-number-display">
@@ -36,8 +37,21 @@
             <div id="allNumbersGrid" class="all-numbers-grid"></div>
         </div>
 
-        <!-- Controle de Wake Lock (redundante com floating, mas mantemos o ID para lógica) -->
-        <div id="wakeLockControl" class="wake-lock-control" style="display:none;"></div>
+        <!-- Voice Settings Modal -->
+        <div id="voiceModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content" style="background: #2c3e50; color: white;">
+                <div class="modal-header">
+                    <h3 style="color: white;">Escolha a Voz</h3>
+                </div>
+                <div class="modal-body" id="voiceList" style="max-height: 300px; overflow-y: auto;">
+                    <!-- Voices will be injected here -->
+                    <p>Carregando vozes...</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="closeVoiceModal" class="btn btn-secondary">Fechar</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Audio Element para efeito de "Ding" -->
@@ -97,18 +111,63 @@
 
         // --- TTS Logic ---
         let voices = [];
+        const voiceModal = document.getElementById('voiceModal');
+        const voiceList = document.getElementById('voiceList');
 
         function loadVoices() {
             voices = window.speechSynthesis.getVoices();
+            renderVoiceList();
         }
+
+        function renderVoiceList() {
+            const ptVoices = voices.filter(v => v.lang.includes('pt'));
+
+            if (ptVoices.length === 0) {
+                voiceList.innerHTML = '<p>Nenhuma voz em Português encontrada.</p>';
+                return;
+            }
+
+            const savedVoice = localStorage.getItem('bingoVoiceURI');
+
+            voiceList.innerHTML = ptVoices.map(v => `
+                <div style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center;">
+                    <input type="radio" name="voiceGroup" value="${v.voiceURI}" id="${v.voiceURI}" 
+                        ${v.voiceURI === savedVoice ? 'checked' : ''} 
+                        onchange="saveVoice('${v.voiceURI}')">
+                    <label for="${v.voiceURI}" style="margin-left: 10px; cursor: pointer; flex: 1;">
+                        ${v.name}
+                    </label>
+                </div>
+            `).join('');
+        }
+
+        window.saveVoice = (uri) => {
+            localStorage.setItem('bingoVoiceURI', uri);
+            // Preview
+            const v = voices.find(voice => voice.voiceURI === uri);
+            if (v && soundEnabled) {
+                // Cancel current
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance('Voz selecionada.');
+                u.voice = v;
+                window.speechSynthesis.speak(u);
+            }
+        };
+
+        // UI Handlers for Modal
+        document.getElementById('voiceSettingsBtn').onclick = () => {
+            if (voices.length === 0) loadVoices();
+            voiceModal.style.display = 'flex';
+        };
+
+        document.getElementById('closeVoiceModal').onclick = () => {
+            voiceModal.style.display = 'none';
+        };
 
         // Wait for voices to be loaded (Chrome/Safari need this)
         window.speechSynthesis.onvoiceschanged = loadVoices;
         // Try initial load
         loadVoices();
-
-        // TTS State
-        let currentVoicePreference = 'default';
 
         function speakNumber(number) {
             if (!soundEnabled || !window.speechSynthesis) return;
@@ -123,33 +182,34 @@
 
             const utterance = new SpeechSynthesisUtterance();
 
-            // 1. Try Preference
+            // 1. Try Local Preference
+            const savedURI = localStorage.getItem('bingoVoiceURI');
             let ptVoice = null;
-            if (currentVoicePreference && currentVoicePreference !== 'default') {
-                ptVoice = voices.find(v => v.name.includes(currentVoicePreference));
+
+            if (savedURI) {
+                ptVoice = voices.find(v => v.voiceURI === savedURI);
             }
 
             // 2. Fallback to common nice voices
             if (!ptVoice) {
-                ptVoice = voices.find(v => v.name.includes('Google Português')) ||
-                    voices.find(v => v.name.includes('Luciana')) ||
-                    voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+                ptVoice = voices.find(v => v.name.includes('Luciana')) ||
+                    voices.find(v => v.name.includes('Google Português')) ||
+                    voices.find(v => v.lang.includes('pt-BR'));
             }
 
             if (ptVoice) utterance.voice = ptVoice;
 
             // "Coluna B (pause). Número 15"
-            // Using periods and commas to force rhythm
             const text = `Coluna ${letter}. , Número ${number}.`;
 
             utterance.text = text;
             utterance.lang = 'pt-BR';
-            utterance.rate = 0.9; // Slightly slower for clarity
+            utterance.rate = 0.9;
             utterance.pitch = 1.0;
 
             utterance.onerror = (e) => console.error('TTS Error:', e);
 
-            console.log('Speaking:', text, 'Voice:', ptVoice ? ptVoice.name : 'Default', 'Pref:', currentVoicePreference);
+            console.log('Speaking:', text, 'Voice:', ptVoice ? ptVoice.name : 'Default');
 
             window.speechSynthesis.speak(utterance);
         }
@@ -322,9 +382,6 @@
         // --- Socket Events ---
 
         socket.on('gameState', state => {
-            // Update Voice Preference
-            if (state.voicePreference) currentVoicePreference = state.voicePreference;
-
             if (state.isShowingAll && state.drawnNumbers.length > 0) showAllNumbers(state.drawnNumbers);
             else if (state.currentNumber) {
                 // Don't replay sound on reconnect/reload, only visual

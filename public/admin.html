@@ -64,20 +64,6 @@
         <div class="status-panel">
             <h2>Dados & Config</h2>
 
-            <div class="voice-selector-container script-control">
-                <label for="voiceSelect" style="display:block; margin-bottom:5px; font-weight:bold; color:#7f8c8d;">🎙️
-                    Voz do Locutor</label>
-                <select id="voiceSelect" onchange="changeVoice()"
-                    style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; font-size:1rem; margin-bottom:15px;">
-                    <option value="default">Padrão do Sistema</option>
-                    <option value="Google Português">Google Português (Chrome/Android)</option>
-                    <option value="Luciana">Luciana (iOS/Mac)</option>
-                    <option value="Joana">Joana (iOS/Mac - Pt-PT?)</option>
-                    <option value="Maria">Maria (Windows)</option>
-                    <option value="Felipe">Felipe (Brasileiro)</option>
-                </select>
-            </div>
-
             <div class="stats-row">
                 <div class="stat-item">
                     <span class="stat-label">Restantes</span>
@@ -202,21 +188,6 @@
                 });
             } catch (e) {
                 console.error('Error toggling display:', e);
-            }
-        }
-
-        async function changeVoice() {
-            const voice = document.getElementById('voiceSelect').value;
-            try {
-                // Assuming 'auth' is defined elsewhere or not needed for this endpoint
-                await fetch('/api/set-voice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, // Removed 'Authorization': auth
-                    body: JSON.stringify({ room: currentRoom, voice })
-                });
-                // Optional: show feedback
-            } catch (e) {
-                console.error('Error setting voice:', e);
             }
         }
 
