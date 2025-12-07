@@ -17,6 +17,7 @@
         <div class="floating-controls">
             <button id="wakeLockBtn" class="control-btn">🔒 Tela Ativa</button>
             <button id="soundBtn" class="control-btn">🔊 Som: ON</button>
+            <button id="debugVoiceBtn" class="control-btn" style="background:#e67e22;">❓ Vozes</button>
         </div>
 
         <div id="currentDisplay" class="current-number-display">
@@ -107,6 +108,9 @@
         // Try initial load
         loadVoices();
 
+        // TTS State
+        let currentVoicePreference = 'default';
+
         function speakNumber(number) {
             if (!soundEnabled || !window.speechSynthesis) return;
 
@@ -120,11 +124,18 @@
 
             const utterance = new SpeechSynthesisUtterance();
 
-            // Try to find a good PT-BR voice
-            // Specific preference list: Google, Microsoft, Apple, then any PT-BR
-            const ptVoice = voices.find(v => v.name.includes('Google Português')) ||
-                voices.find(v => v.name.includes('Luciana')) ||
-                voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+            // 1. Try Preference
+            let ptVoice = null;
+            if (currentVoicePreference && currentVoicePreference !== 'default') {
+                ptVoice = voices.find(v => v.name.includes(currentVoicePreference));
+            }
+
+            // 2. Fallback to common nice voices
+            if (!ptVoice) {
+                ptVoice = voices.find(v => v.name.includes('Google Português')) ||
+                    voices.find(v => v.name.includes('Luciana')) ||
+                    voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+            }
 
             if (ptVoice) utterance.voice = ptVoice;
 
@@ -139,7 +150,7 @@
 
             utterance.onerror = (e) => console.error('TTS Error:', e);
 
-            console.log('Speaking:', text, 'Voice:', ptVoice ? ptVoice.name : 'Default');
+            console.log('Speaking:', text, 'Voice:', ptVoice ? ptVoice.name : 'Default', 'Pref:', currentVoicePreference);
 
             window.speechSynthesis.speak(utterance);
         }
@@ -167,6 +178,14 @@
                 wakeLockBtn.textContent = '🔒 Tela Ativa';
                 wakeLockBtn.classList.remove('active');
             }
+        };
+
+        // Debug Voices Button
+        document.getElementById('debugVoiceBtn').onclick = () => {
+            if (voices.length === 0) loadVoices();
+            const ptVoices = voices.filter(v => v.lang.includes('pt'));
+            const names = ptVoices.map(v => v.name).join('\n');
+            alert(`Vozes PT encontradas:\n${names || 'Nenhuma (Verifique Ajustes > Acessibilidade)'}`);
         };
 
         function showCurrentNumber(number) {
@@ -311,6 +330,9 @@
         // --- Socket Events ---
 
         socket.on('gameState', state => {
+            // Update Voice Preference
+            if (state.voicePreference) currentVoicePreference = state.voicePreference;
+
             if (state.isShowingAll && state.drawnNumbers.length > 0) showAllNumbers(state.drawnNumbers);
             else if (state.currentNumber) {
                 // Don't replay sound on reconnect/reload, only visual

@@ -125,6 +125,25 @@ app.post('/api/show-all', authMiddleware, (req, res) => {
     res.json(newState);
 });
 
+// Toggle display mode (Show All / Show Current)
+app.post('/api/toggle-display', (req, res) => {
+    const { room } = req.body;
+    const mode = req.query.mode; // 'all' or 'current' (optional explicit set)
+    const newState = gameState.toggleDisplayMode(room, mode);
+    io.to(room).emit('gameState', newState);
+    res.json(newState);
+});
+
+// Set Voice Preference
+app.post('/api/set-voice', (req, res) => {
+    const { room, voice } = req.body;
+    if (!voice) return res.status(400).json({ error: 'Voice name required' });
+
+    const newState = gameState.setVoicePreference(room, voice);
+    io.to(room).emit('gameState', newState);
+    res.json(newState);
+});
+
 // Proteger a página de admin
 app.use('/admin.html', authMiddleware);
 

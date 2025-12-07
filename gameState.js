@@ -39,10 +39,18 @@ class GameState {
                 currentNumber: null,
                 drawnNumbers: [],
                 isShowingAll: false,
+                voicePreference: 'default', // Preferred voice name pattern
                 lastActivity: Date.now()
             };
         }
         return this.rooms[roomName];
+    }
+
+    setVoicePreference(roomName, voiceName) {
+        const state = this.get(roomName);
+        state.voicePreference = voiceName;
+        this.save();
+        return state;
     }
 
     get(roomName) {

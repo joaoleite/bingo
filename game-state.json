@@ -20,17 +20,19 @@
     "lastActivity": 1765063505339
   },
   "public": {
-    "currentNumber": 63,
+    "currentNumber": 33,
     "drawnNumbers": [
-      3,
-      10,
-      36,
       32,
+      16,
+      11,
+      28,
+      4,
+      43,
       19,
-      63
+      33
     ],
     "isShowingAll": false,
-    "lastActivity": 1765086757962
+    "lastActivity": 1765087101887
   },
   "QA": {
     "currentNumber": 12,
