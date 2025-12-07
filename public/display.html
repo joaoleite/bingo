@@ -86,6 +86,8 @@
 
         // --- TTS & Audio ---
 
+        // --- Audio & TTS --- 
+
         function playSound() {
             if (!soundEnabled) return;
             // Play Ding
@@ -93,8 +95,23 @@
             dingSound.play().catch(e => console.log('Audio autoplay blocked', e));
         }
 
+        // --- TTS Logic ---
+        let voices = [];
+
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+        }
+
+        // Wait for voices to be loaded (Chrome/Safari need this)
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        // Try initial load
+        loadVoices();
+
         function speakNumber(number) {
             if (!soundEnabled || !window.speechSynthesis) return;
+
+            // Ensure voices are loaded
+            if (voices.length === 0) loadVoices();
 
             const letter = getBingoLetter(number);
             const text = `Letra ${letter}. Número ${number}.`;
@@ -103,9 +120,16 @@
             window.speechSynthesis.cancel();
 
             const utterance = new SpeechSynthesisUtterance(text);
+
+            // Try to find a good PT-BR voice
+            const ptVoice = voices.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt_BR'));
+            if (ptVoice) utterance.voice = ptVoice;
+
             utterance.lang = 'pt-BR';
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
+
+            utterance.onerror = (e) => console.error('TTS Error:', e);
 
             window.speechSynthesis.speak(utterance);
         }
