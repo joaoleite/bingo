@@ -1,0 +1,5 @@
+{
+  "name": "Bingo Master Pro",
+  "description": "A professional Bingo caller application with separate Admin and Display views, featuring real-time state synchronization, text-to-speech, and QR code sharing.",
+  "requestFramePermissions": []
+}
