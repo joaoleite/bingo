@@ -91,13 +91,27 @@ const ADMIN_PASS = process.env.ADMIN_PASS || 'admin';
 
 ### B007: Race Condition Possível
 **Severidade:** MÉDIA
-**Estado:** ⚠️ PARCIALMENTE CORRIGIDO
+**Estado:** ✅ CORRIGIDO
 
-O `gameState.js` usa `fs.writeFileSync` sem lock. Se múltiplos sockets tentarem sortear simultaneamente, pode haver perda de dados.
+O `gameState.js` usava `fs.writeFileSync` sem lock. Se múltiplos sockets tentassem sortear simultaneamente, podia haver perda de dados.
 
-**Correção parcial:** Sorteio agora é feito no servidor (não no client), reduzindo window de race condition.
+**Correção:** Implementado Mutex in-memory simples com queue:
 
-**Ainda pendente:** Implementar file locking ou usar banco de dados.
+```javascript
+class Mutex {
+    constructor() { this.locked = false; this.queue = []; }
+    async acquire() {
+        if (!this.locked) { this.locked = true; return () => this.release(); }
+        return new Promise(resolve => this.queue.push(resolve));
+    }
+    release() {
+        if (this.queue.length > 0) this.queue.shift()();
+        else this.locked = false;
+    }
+}
+```
+
+Todas as operações de escrita (`drawNumber`, `reset`, `setShowAll`, etc.) agora usam `acquire()`/`release()`.
 
 ---
 
@@ -148,6 +162,7 @@ O código usa `console.log` e `console.error` diretamente. Em produção, deveri
 | B003 | Git corrompido | 2026-04-04 |
 | B005 | Sem validação de input | 2026-04-04 |
 | B006 | Basic Auth hardcoded | 2026-04-04 |
+| B007 | Race condition | 2026-04-04 |
 | B008 | Nomes de salas não sanitizados | 2026-04-04 |
 
 ---

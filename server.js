@@ -121,7 +121,7 @@ app.get('/api/qr/:name', validateRoomName, async (req, res) => {
 // ======================
 
 // Sortear número
-app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, async (req, res) => {
   const { name } = req.params;
   const room = gameState.get(name);
 
@@ -142,7 +142,7 @@ app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, (req, res) => {
   } while (drawnNumbers.includes(number));
 
   try {
-    const updatedRoom = gameState.drawNumber(name, number);
+    const updatedRoom = await gameState.drawNumber(name, number);
 
     // Emitir para todos na sala
     io.to(name).emit('number-drawn', {
@@ -181,11 +181,11 @@ app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, (req, res) => {
 });
 
 // Resetar sala
-app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, async (req, res) => {
   const { name } = req.params;
 
   try {
-    const room = gameState.reset(name);
+    const room = await gameState.reset(name);
 
     io.to(name).emit('room-reset', {
       room: name,
@@ -218,11 +218,11 @@ app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, (req, res) => {
 });
 
 // Mostrar todos os números
-app.post('/api/rooms/:name/show-all', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/show-all', adminAuth, validateRoomName, async (req, res) => {
   const { name } = req.params;
 
   try {
-    const room = gameState.setShowAll(name, true);
+    const room = await gameState.setShowAll(name, true);
 
     io.to(name).emit('show-mode-changed', {
       room: name,
@@ -240,11 +240,11 @@ app.post('/api/rooms/:name/show-all', adminAuth, validateRoomName, (req, res) =>
 });
 
 // Mostrar apenas último número
-app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, async (req, res) => {
   const { name } = req.params;
 
   try {
-    const room = gameState.setShowLast(name);
+    const room = await gameState.setShowLast(name);
 
     io.to(name).emit('show-mode-changed', {
       room: name,
@@ -262,7 +262,7 @@ app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, (req, res) =
 });
 
 // Definir preferência de voz
-app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, async (req, res) => {
   const { name } = req.params;
   const { voiceName } = req.body;
 
@@ -275,7 +275,7 @@ app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, (req, res) => {
   }
 
   try {
-    const room = gameState.setVoicePreference(name, voiceName);
+    const room = await gameState.setVoicePreference(name, voiceName);
 
     io.to(name).emit('voice-preference-changed', {
       room: name,
@@ -344,7 +344,7 @@ io.on('connection', (socket) => {
   });
 
   // Solicitar sorteio (apenas admins via socket)
-  socket.on('draw-number', ({ roomName }) => {
+  socket.on('draw-number', async ({ roomName }) => {
     const room = gameState.get(roomName);
 
     if (room.drawnNumbers.length >= 75) {
@@ -362,7 +362,7 @@ io.on('connection', (socket) => {
     } while (drawnNumbers.includes(number));
 
     try {
-      const updatedRoom = gameState.drawNumber(roomName, number);
+      const updatedRoom = await gameState.drawNumber(roomName, number);
 
       io.to(roomName).emit('number-drawn', {
         room: roomName,
