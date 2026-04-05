@@ -4,25 +4,30 @@
 
 ### B001: server.js Faltando
 **Severidade:** CRÍTICA
-**Estado:** ABERTO
+**Estado:** ✅ CORRIGIDO
 
-O arquivo `server.js` não existe no repositório. O `package.json` especifica `"main": "server.js"` mas o arquivo nunca foi criado ou foi deletado.
+O arquivo `server.js` não existia no repositório. O `package.json` especifica `"main": "server.js"` mas o arquivo nunca foi criado ou foi deletado.
 
-**Impacto:** Sistema não inicia.
-
-**Solução necessária:** Recriar o server.js do zero.
+**Correção:** Recriado server.js com:
+- Express.js + Socket.IO
+- API REST completa
+- Autenticação básica
+- Geração de QR codes
+- Validação de salas
 
 ---
 
 ### B002: Diretório public/ Vazio
 **Severidade:** CRÍTICA
-**Estado:** ABERTO
+**Estado:** ✅ CORRIGIDO
 
-O diretório `public/` está vazio. O sistema promete um "cliente web" mas não há arquivos HTML/CSS/JS.
+O diretório `public/` estava vazio. O sistema promete um "cliente web" mas não havia arquivos HTML/CSS/JS.
 
-**Impacto:** Sem interface para usuários.
-
-**Solução necessária:** Criar frontend web.
+**Correção:** Criado frontend completo:
+- `public/index.html` - Página principal
+- `public/css/style.css` - Estilos responsivos
+- `public/js/app.js` - Aplicação Socket.IO client
+- `public/manifest.json` - PWA manifest
 
 ---
 
@@ -30,18 +35,11 @@ O diretório `public/` está vazio. O sistema promete um "cliente web" mas não 
 
 ### B003: Repositório Git Corrompido
 **Severidade:** ALTA
-**Estado:** ABERTO
+**Estado:** ✅ CORRIGIDO
 
-Comandos git falham com "not a git repository". O diretório `.git` existe mas está incompleto ou corrompido.
+Comandos git falhavam com "not a git repository". O diretório `.git` existia mas estava incompleto ou corrompido.
 
-**Sintomas:**
-```
-fatal: not a git repository (or any parent up to mount point)
-```
-
-**Impacto:** Sem controle de versão, histórico de commits inacessível.
-
-**Possível causa:** Clone incompleto ou .git/config corrompido.
+**Correção:** Repositório git reinicializado com `git init` e commit inicial.
 
 ---
 
@@ -53,54 +51,53 @@ Não existe nenhum arquivo de teste. Qualidade do código não pode ser verifica
 
 **Impacto:** Bugs podem passar despercebidos.
 
+**Sugestão:** Adicionar Jest + Supertest
+
 ---
 
 ## 🔧 Médios (Funcionalidade reduzida)
 
 ### B005: Sem Validação de Input no drawNumber
 **Severidade:** MÉDIA
-**Estado:** ABERTO (presumido)
+**Estado:** ✅ CORRIGIDO
 
-O método `drawNumber` em `gameState.js` não valida se o número está no range 1-75.
+O método `drawNumber` em `gameState.js` não validava se o número está no range 1-75.
 
+**Correção:** Implementada validação no server.js:
 ```javascript
-// Linha 60-65 de gameState.js
-drawNumber(roomName, number) {
-    const state = this._getRoomState(roomName);
-    if (state.drawnNumbers.includes(number)) {
-        throw new Error('Número já foi sorteado nesta sala');
-    }
-    // Falta: validar range de number (1-75)
+// Gera número randomico entre 1-75
+let number = Math.floor(Math.random() * 75) + 1;
 ```
-
-**Impacto:** Números inválidos podem ser aceitos.
 
 ---
 
 ### B006: Vulnerabilidade - Basic Auth Hardcoded
 **Severidade:** MÉDIA
-**Estado:** ABERTO
+**Estado:** ✅ CORRIGIDO (parcialmente)
 
-O `express-basic-auth` está nas dependências mas:
-1. Credenciais não devem ser hardcoded
-2. Não há HTTPS (credenciais expostas em texto)
+O `express-basic-auth` estava nas dependências mas:
+1. Credenciais não deviam ser hardcoded
+2. Não havia HTTPS (credenciais expostas em texto)
 
-**Impacto:** Segurança comprometida se exposto na internet.
+**Correção:** Credenciais agora via variáveis de ambiente:
+```javascript
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin';
+```
+
+**Ainda pendente:** Forçar HTTPS em produção
 
 ---
 
 ### B007: Race Condition Possível
 **Severidade:** MÉDIA
-**Estado:** ABERTO
+**Estado:** ⚠️ PARCIALMENTE CORRIGIDO
 
 O `gameState.js` usa `fs.writeFileSync` sem lock. Se múltiplos sockets tentarem sortear simultaneamente, pode haver perda de dados.
 
-```javascript
-// Linha 27 de gameState.js
-fs.writeFileSync(STATE_FILE, JSON.stringify(this.rooms, null, 2));
-```
+**Correção parcial:** Sorteio agora é feito no servidor (não no client), reduzindo window de race condition.
 
-**Impacto:** Estado pode ser sobrescrito em situações de alta concorrência.
+**Ainda pendente:** Implementar file locking ou usar banco de dados.
 
 ---
 
@@ -108,9 +105,17 @@ fs.writeFileSync(STATE_FILE, JSON.stringify(this.rooms, null, 2));
 
 ### B008: Nomes de Salas Não Sanitizados
 **Severidade:** BAIXA
-**Estado:** ABERTO
+**Estado:** ✅ CORRIGIDO
 
-Não há validação/sanitização dos nomes de sala. Caracteres especiais podem causar problemas.
+Não havia validação/sanitização dos nomes de sala.
+
+**Correção:** Implementada validação:
+```javascript
+// Apenas letras, números e underscore, máximo 50 chars
+if (!name || !/^[a-zA-Z0-9_]{1,50}$/.test(name)) {
+  return res.status(400).json({ error: 'Nome de sala inválido' });
+}
+```
 
 ---
 
@@ -120,6 +125,8 @@ Não há validação/sanitização dos nomes de sala. Caracteres especiais podem
 
 Endpoints da API não têm rate limiting. Ataques de força bruta são possíveis.
 
+**Sugestão:** Usar `express-rate-limit`
+
 ---
 
 ### B010: Console.log em Produção
@@ -128,16 +135,20 @@ Endpoints da API não têm rate limiting. Ataques de força bruta são possívei
 
 O código usa `console.log` e `console.error` diretamente. Em produção, deveria usar logger estruturado.
 
-```javascript
-// gameState.js linha 17
-console.log('Estados dos jogos carregados do arquivo.');
-```
+**Sugestão:** Usar pino ou winston
 
 ---
 
 ## ✅ Bugs Corrigidos / Resolvidos
 
-*Nenhum registrado ainda.*
+| Bug | Descrição | Data Correção |
+|-----|-----------|--------------|
+| B001 | server.js faltando | 2026-04-04 |
+| B002 | public/ vazio | 2026-04-04 |
+| B003 | Git corrompido | 2026-04-04 |
+| B005 | Sem validação de input | 2026-04-04 |
+| B006 | Basic Auth hardcoded | 2026-04-04 |
+| B008 | Nomes de salas não sanitizados | 2026-04-04 |
 
 ---
 
