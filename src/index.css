@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e94560;
+  border-radius: 3px;
+}
+
+/* Number ball styles */
+.number-ball {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  box-shadow: 
+    inset -3px -3px 6px rgba(0,0,0,0.3),
+    inset 3px 3px 6px rgba(255,255,255,0.2),
+    0 4px 8px rgba(0,0,0,0.3);
+}
+
+.number-ball.current {
+  width: 80px;
+  height: 80px;
+  font-size: 32px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Animations */
+@keyframes dropIn {
+  0% { 
+    transform: translateY(-20px) scale(0.5); 
+    opacity: 0; 
+  }
+  60% { 
+    transform: translateY(5px) scale(1.1); 
+    opacity: 1; 
+  }
+  100% { 
+    transform: translateY(0) scale(1); 
+    opacity: 1; 
+  }
+}
+
+.animate-drop {
+  animation: dropIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-primary text-white font-bold py-3 px-6 rounded-xl shadow-lg;
+  @apply active:scale-95 transition-transform;
+}
+
+.btn-secondary {
+  @apply bg-gray-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg;
+  @apply active:scale-95 transition-transform;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg;
+  @apply active:scale-95 transition-transform;
+}
