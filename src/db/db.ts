@@ -25,9 +25,9 @@ class BingoDatabase extends Dexie {
 
 export const db = new BingoDatabase();
 
-export async function saveGame(game: BingoGame): Promise<number> {
+export async function saveGame(game: BingoGame): Promise<void> {
   game.updatedAt = Date.now();
-  return await db.games.put(game);
+  await db.games.put(game);
 }
 
 export async function getGame(gameId: string): Promise<BingoGame | undefined> {
