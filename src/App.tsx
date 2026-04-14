@@ -1,15 +1,130 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getActiveGame, saveGame, createNewGame, resetGame, BingoGame } from './db/db';
 import { getRandomNumber, getRemainingNumbers, isGameComplete } from './utils/bingo';
 import { GameType } from './utils/bingo';
+import QRCode from 'qrcode';
+import { io, Socket } from 'socket.io-client';
+
+// Backend URL - configure based on environment
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'https://bingoplay.jota.qzz.io';
 
 function App() {
   const [gameType] = useState<GameType>(75);
   const [manualNumber, setManualNumber] = useState('');
   const [showAll, setShowAll] = useState(false);
   
+  // Online/Offline detection
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [showQR, setShowQR] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<number | null>(null);
+  
   const currentGame = useLiveQuery(() => getActiveGame());
+
+  // Detect online/offline
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      connectSocket();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (navigator.onLine) {
+      connectSocket();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (socket) socket.disconnect();
+    };
+  }, []);
+
+  // Connect to socket.io
+  const connectSocket = useCallback(() => {
+    if (socket) return;
+    
+    const newSocket = io(SERVER_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('Connected to server');
+      if (currentGame) {
+        newSocket.emit('join-room', currentGame.gameId);
+      }
+    });
+
+    newSocket.on('number-drawn', (data) => {
+      // Display mode - receive number from admin
+      if (currentGame) {
+        saveGame({
+          ...currentGame,
+          drawnNumbers: data.drawnNumbers,
+          currentNumber: data.number,
+          status: data.status,
+          syncedAt: Date.now()
+        });
+        setLastSynced(Date.now());
+      }
+    });
+
+    newSocket.on('game-reset', () => {
+      if (currentGame) {
+        resetGame(currentGame.gameId, currentGame.gameType);
+      }
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+
+    setSocket(newSocket);
+  }, [socket, currentGame]);
+
+  // Generate QR Code
+  useEffect(() => {
+    if (showQR && currentGame) {
+      const displayUrl = `${window.location.origin}?mode=display&room=${currentGame.gameId}`;
+      QRCode.toDataURL(displayUrl, {
+        width: 280,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }).then(setQrDataUrl);
+    }
+  }, [showQR, currentGame]);
+
+  // Sync to server when online
+  const syncToServer = useCallback(async (game: BingoGame) => {
+    if (!socket || !isOnline || !game) return;
+    
+    socket.emit('draw-number', {
+      roomId: game.gameId,
+      number: game.currentNumber,
+      drawnNumbers: game.drawnNumbers,
+      currentNumber: game.currentNumber,
+      status: game.status
+    });
+    
+    setLastSynced(Date.now());
+  }, [socket, isOnline]);
 
   // Create new game if none exists
   useEffect(() => {
@@ -17,6 +132,13 @@ function App() {
       createNewGame(gameType);
     }
   }, [currentGame, gameType]);
+
+  // Join room when game is ready
+  useEffect(() => {
+    if (currentGame && socket && isOnline) {
+      socket.emit('join-room', currentGame.gameId);
+    }
+  }, [currentGame, socket, isOnline]);
 
   const handleDrawRandom = async () => {
     if (!currentGame) return;
@@ -29,9 +151,15 @@ function App() {
         currentNumber: newNumber,
         status: isGameComplete([...currentGame.drawnNumbers, newNumber], currentGame.gameType) 
           ? 'completed' 
-          : 'active'
+          : 'active',
+        syncedAt: isOnline ? Date.now() : null
       };
       await saveGame(updatedGame);
+      
+      // Sync to display if online
+      if (isOnline && socket) {
+        await syncToServer(updatedGame);
+      }
     } catch (error) {
       alert('Todos os números já foram sorteados!');
     }
@@ -57,10 +185,16 @@ function App() {
       currentNumber: number,
       status: isGameComplete([...currentGame.drawnNumbers, number], currentGame.gameType) 
         ? 'completed' 
-        : 'active'
+        : 'active',
+      syncedAt: isOnline ? Date.now() : null
     };
     await saveGame(updatedGame);
     setManualNumber('');
+    
+    // Sync to display if online
+    if (isOnline && socket) {
+      await syncToServer(updatedGame);
+    }
   };
 
   const handleReset = async () => {
@@ -68,6 +202,11 @@ function App() {
     if (!confirm('Tem certeza que deseja reiniciar o jogo? Todos os números serão limpos.')) return;
     
     await resetGame(currentGame.gameId, currentGame.gameType);
+    
+    // Notify displays if online
+    if (isOnline && socket) {
+      socket.emit('reset-game', { roomId: currentGame.gameId });
+    }
   };
 
   if (!currentGame) {
@@ -84,12 +223,28 @@ function App() {
   const remaining = getRemainingNumbers(currentGame.drawnNumbers, currentGame.gameType);
 
   return (
-    <div className="min-h-screen p-4 text-white">
-      {/* Header */}
-      <header className="text-center mb-6">
-        <h1 className="text-3xl font-bold text-primary">🎯 Bingoplay</h1>
-        <p className="text-gray-400 text-sm">Sala: {currentGame.gameId}</p>
+    <div className="min-h-screen p-4 text-white pb-24">
+      {/* Header with online status */}
+      <header className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-primary">🎯 Bingoplay</h1>
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
+          <span className="text-xs text-gray-400">{isOnline ? 'Online' : 'Offline'}</span>
+        </div>
       </header>
+
+      {/* Room & Sync Info */}
+      <div className="bg-darker rounded-lg p-2 mb-4 flex justify-between items-center">
+        <div className="text-sm">
+          <span className="text-gray-400">Sala: </span>
+          <span className="font-mono text-primary">{currentGame.gameId}</span>
+        </div>
+        {lastSynced && (
+          <span className="text-xs text-gray-500">
+            Sync: {new Date(lastSynced).toLocaleTimeString('pt-BR')}
+          </span>
+        )}
+      </div>
 
       {/* Current Number Display */}
       <div className="flex justify-center mb-8">
@@ -151,13 +306,58 @@ function App() {
             {showAll ? '🎯 Último' : '📋 Todos'}
           </button>
           <button
-            onClick={handleReset}
-            className="btn-danger flex-1"
+            onClick={() => setShowQR(!showQR)}
+            className="btn-secondary flex-1"
           >
-            🔄 Reset
+            📡 QR Display
+          </button>
+          <button
+            onClick={handleReset}
+            className="btn-danger"
+          >
+            🔄
           </button>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQR && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-darker rounded-2xl p-6 max-w-sm w-full text-center"
+          >
+            <h3 className="text-xl font-bold mb-4">📡 Display Remoto</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Escaneie para abrir o display em outro dispositivo
+            </p>
+            
+            {qrDataUrl ? (
+              <img 
+                src={qrDataUrl} 
+                alt="QR Code" 
+                className="mx-auto mb-4 rounded-lg"
+              />
+            ) : (
+              <div className="bg-white p-4 rounded-lg mb-4">
+                <p className="text-black">Gerando QR...</p>
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-500 mb-4 font-mono">
+              ?mode=display&room={currentGame.gameId}
+            </p>
+            
+            <button
+              onClick={() => setShowQR(false)}
+              className="btn-secondary w-full"
+            >
+              Fechar
+            </button>
+          </motion.div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="bg-darker rounded-xl p-4 mb-4">
