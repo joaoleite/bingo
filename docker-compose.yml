@@ -1,14 +1,33 @@
 version: '3.8'
 
 services:
+  # Bingo Server (Socket.io + Express)
   server:
-    build: .
+    build:
+      context: ./server
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
+      - NODE_ENV=production
     restart: unless-stopped
+    networks:
+      - bingo-net
+
+  # Bingo Client (Static UI via nginx)
+  client:
+    image: nginx:alpine
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks:
+      - bingo-net
 
 networks:
-  default:
-    name: bingo-pwa
+  bingo-net:
+    name: bingo-pwa-net
