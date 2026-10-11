@@ -325,10 +325,13 @@ els.optVoice.addEventListener('change', () => run(els.optVoice, async () => {
 }));
 els.optRepeat.addEventListener('change', savePrefs);
 
-els.optLocal.addEventListener('change', async () => {
-  if (els.optLocal.checked) {
+// Som neste celular: precisa ser ligado dentro de um toque (regra do iPhone)
+async function setLocalSound(on) {
+  els.optLocal.checked = on;
+  if (on) {
     try {
       await announcer.enable();
+      toast('📱 Som ligado neste celular');
     } catch (e) {
       els.optLocal.checked = false;
       toast('O navegador bloqueou o som', true);
@@ -338,14 +341,19 @@ els.optLocal.addEventListener('change', async () => {
   }
   socket?.emit('speaker', { on: announcer.enabled });
   savePrefs();
-});
+  renderSpeakers();
+}
+
+els.optLocal.addEventListener('change', () => setLocalSound(els.optLocal.checked));
 
 // Som local salvo como ligado: o navegador só libera depois do primeiro toque
-document.addEventListener('pointerdown', async () => {
+document.addEventListener('pointerdown', async event => {
+  if (event.target.closest?.('.target-here')) return; // o próprio botão cuida disso
   if (els.optLocal.checked && !announcer.enabled) {
     try {
       await announcer.enable();
       socket?.emit('speaker', { on: true });
+      renderSpeakers();
     } catch (e) { /* tenta de novo no próximo toque */ }
   }
 });
@@ -380,17 +388,26 @@ function renderSpeakers() {
 
 // Fileira "Tocar em": Todas + cada caixa ligada (e as escolhidas que caíram, apagadas)
 function renderTargets() {
-  const devices = [...speakerDevices];
+  const devices = speakerDevices.filter(d => d.id !== DEVICE_ID);
   selectedTargets.forEach((name, id) => {
     if (!devices.some(d => d.id === id)) devices.push({ id, name, offline: true });
   });
-  els.targets.hidden = devices.length === 0;
+  els.targets.hidden = false;
   els.targetChips.innerHTML = '';
+
+  // Este celular: liga/desliga o som aqui; quando ligado toca tudo, seja qual for a escolha
+  const here = document.createElement('button');
+  here.type = 'button';
+  here.className = `target-chip target-here${announcer.enabled ? ' active' : ''}`;
+  here.textContent = announcer.enabled ? '📱 Este celular' : '📱 Este celular (mudo)';
+  here.addEventListener('click', () => setLocalSound(!announcer.enabled));
+  els.targetChips.appendChild(here);
+  if (!devices.length) return;
 
   const all = document.createElement('button');
   all.type = 'button';
   all.className = `target-chip${selectedTargets.size ? '' : ' active'}`;
-  all.textContent = `🔊 Todas${speakerDevices.length > 1 ? ` (${speakerDevices.length})` : ''}`;
+  all.textContent = `🔊 Todas as caixas${devices.length > 1 ? ` (${devices.length})` : ''}`;
   all.addEventListener('click', () => {
     selectedTargets.clear();
     savePrefs();
@@ -402,7 +419,7 @@ function renderTargets() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `target-chip${selectedTargets.has(device.id) ? ' active' : ''}${device.offline ? ' offline' : ''}`;
-    chip.textContent = device.id === DEVICE_ID ? `📱 ${device.name}` : device.name;
+    chip.textContent = device.name;
     if (device.offline) chip.title = 'Desconectada';
     chip.addEventListener('click', () => {
       if (selectedTargets.has(device.id)) selectedTargets.delete(device.id);
@@ -442,7 +459,8 @@ function connectSocket() {
   });
 
   socket.on('announce', event => {
-    if (event.room === room && announcer.enabled) announcer.handle(event);
+    // Este celular toca tudo, mesmo quando o envio é só para algumas caixas
+    if (event.room === room && announcer.enabled) announcer.handle({ ...event, targets: null });
   });
 }
 
