@@ -30,7 +30,10 @@ const announcer = new Announcer({
   onClip: clip => {
     els.board.querySelector('.speaking')?.classList.remove('speaking');
     if (clip && cells[clip]) cells[clip].classList.add('speaking');
-  }
+  },
+  // Navegador travou o som: mostra de novo o botão "Ativar som"
+  onBlocked: () => { els.overlay.hidden = false; },
+  onLog: message => socket.emit('client-log', { message })
 });
 
 function render() {
@@ -95,6 +98,9 @@ socket.on('connect', () => {
   socket.emit('join-room', { roomName: room, speaker: announcer.enabled, deviceId: DEVICE_ID, deviceName: getDeviceName() });
 });
 socket.on('disconnect', () => setConnection(els.connection, false));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !socket.connected) socket.connect();
+});
 
 socket.on('room-state', data => {
   if (data.name !== room) return;

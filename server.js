@@ -112,9 +112,16 @@ function broadcastRoom(name) {
 
 // Pede para as caixas de som da sala falarem algo.
 // targets: lista de ids de aparelho que devem tocar (null = todas as caixas)
+// Cada anúncio tem um id: o aparelho que recebe duas vezes (resposta + websocket,
+// ou reconexão) toca só uma.
+const lastAnnounceByRoom = new Map();
 function announce(name, payload, targets = null) {
-  io.to(name).emit('announce', { room: name, ...payload, targets, timestamp: Date.now() });
+  const event = { id: crypto.randomUUID().slice(0, 12), room: name, ...payload, targets, timestamp: Date.now() };
+  lastAnnounceByRoom.set(name, event);
+  io.to(name).emit('announce', event);
+  return event;
 }
+const REPLAY_WINDOW_MS = 10000;
 
 // Caixas escolhidas no controle: { targets: [...] } no JSON ou ?targets=a,b (gravação)
 function parseTargets(req, res, next) {
@@ -122,6 +129,15 @@ function parseTargets(req, res, next) {
   if (typeof list === 'string') list = list.split(',');
   list = Array.isArray(list) ? list.filter(id => typeof id === 'string' && DEVICE_REGEX.test(id)).slice(0, 20) : [];
   req.targets = list.length ? list : null;
+
+  // Devolve na resposta o que foi anunciado, para o controle tocar sem depender do websocket
+  const startedAt = Date.now();
+  const json = res.json.bind(res);
+  res.json = body => {
+    const last = lastAnnounceByRoom.get(req.params.name);
+    if (body && typeof body === 'object' && last && last.timestamp >= startedAt) body = { ...body, announce: last };
+    return json(body);
+  };
   next();
 }
 
@@ -472,6 +488,10 @@ io.on('connection', (socket) => {
     socket.emit('room-state', serializeRoom(roomName));
     broadcastSpeakers(roomName);
 
+    // Caiu e voltou no meio de um anúncio: entrega o último (o aparelho ignora se já tocou)
+    const last = lastAnnounceByRoom.get(roomName);
+    if (last && Date.now() - last.timestamp < REPLAY_WINDOW_MS) socket.emit('announce', last);
+
     console.log(`Socket ${socket.id} entrou na sala ${roomName}`);
   });
 
@@ -480,6 +500,13 @@ io.on('connection', (socket) => {
     socket.data.speaker = Boolean(on);
     if (deviceName !== undefined) socket.data.deviceName = cleanDeviceName(deviceName);
     if (socket.data.room) broadcastSpeakers(socket.data.room);
+  });
+
+  // Erros de som relatados pelos aparelhos (ajuda a investigar "às vezes não toca")
+  socket.on('client-log', ({ message } = {}) => {
+    if (typeof message !== 'string') return;
+    const who = socket.data.deviceName || socket.id;
+    console.log(`[aparelho ${who}] ${message.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200)}`);
   });
 
   // Sair de uma sala

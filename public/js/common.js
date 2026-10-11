@@ -136,7 +136,7 @@ document.addEventListener('visibilitychange', keepScreenOn);
 // Usa um único elemento <audio>: depois que ele toca uma vez por clique do usuário,
 // o navegador (inclusive iPhone) libera trocar o arquivo e tocar de novo sem novo clique.
 class Announcer {
-  constructor({ onClip } = {}) {
+  constructor({ onClip, onBlocked, onLog } = {}) {
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.queue = [];
@@ -145,17 +145,27 @@ class Announcer {
     this.enabled = false;
     this.voice = DEFAULT_VOICE;
     this.onClip = onClip;
+    this.onBlocked = onBlocked; // o navegador bloqueou o som: precisa de um toque na tela
+    this.onLog = onLog;
+    this.blocked = false;
+    this.seen = [];
 
     this.audio.addEventListener('ended', () => this.next());
     this.audio.addEventListener('error', () => this.next());
   }
 
   // Precisa ser chamado dentro de um clique/toque
+  // Se havia fala pendente por bloqueio, ela continua quando o sinal terminar
   async enable() {
+    const resuming = this.blocked && this.queue.length > 0;
     this.audio.src = '/audio/sinal.mp3';
     await this.audio.play();
-    this.enabled = true;
-    this.preloadAll();
+    this.blocked = false;
+    if (!this.enabled) {
+      this.enabled = true;
+      this.preloadAll();
+    }
+    if (resuming) this.busy = true;
   }
 
   disable() {
@@ -214,7 +224,19 @@ class Announcer {
 
     this.onClip?.(item);
     this.audio.src = this.clipUrl(item);
-    this.audio.play().catch(() => this.next());
+    this.audio.play().catch(error => {
+      if (error.name === 'NotAllowedError') {
+        // iPhone travou o som (tela bloqueada, ligação, outro app): guarda e espera um toque
+        this.queue.unshift(item);
+        this.busy = false;
+        this.blocked = true;
+        this.onLog?.(`som bloqueado: ${error.message}`);
+        this.onBlocked?.();
+        return;
+      }
+      if (error.name !== 'AbortError') this.onLog?.(`falha ao tocar ${item}: ${error.name} ${error.message}`);
+      this.next();
+    });
   }
 
   // "Letra B. Número 10." — com sinal antes e repetição opcional
@@ -239,6 +261,10 @@ class Announcer {
 
   handle(event) {
     if (!this.isForMe(event)) return;
+    if (event.id) {
+      if (this.seen.includes(event.id)) return;
+      this.seen = [...this.seen.slice(-49), event.id];
+    }
     if (event.kind === 'number') this.number(event.number, event.repeat);
     else if (event.kind === 'recap') this.recap(event.numbers || []);
     else if (event.kind === 'new-game') this.play(['novo-jogo']);

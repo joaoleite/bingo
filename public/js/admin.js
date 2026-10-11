@@ -48,7 +48,15 @@ let speakerDevices = []; // [{ id, name }] com som ligado agora
 let selectedTargets = new Map();
 const LOCAL_DEVICE_NAME = 'Celular do controle';
 let padMode = 'mark'; // 'mark' marca o número; 'check' só responde se já saiu
-const announcer = new Announcer();
+const announcer = new Announcer({
+  onBlocked: () => toast('🔇 O iPhone travou o som. Toque em qualquer lugar da tela', true),
+  onLog: message => socket?.emit('client-log', { message })
+});
+
+// Toca neste celular o que o servidor anunciou (resposta do botão ou websocket; o id evita repetir)
+function playHere(event) {
+  if (event && event.room === room && announcer.enabled) announcer.handle({ ...event, targets: null });
+}
 const cells = buildBoard(els.pad, { asButtons: true, onSelect: selectNumber });
 
 // ---------- Armazenamento local (pode falhar em aba anônima) ----------
@@ -97,6 +105,7 @@ async function api(action, body = {}) {
     throw new Error('Sessão expirada, entre de novo');
   }
   if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao falar com o servidor');
+  playHere(data.announce);
   return data;
 }
 
@@ -201,10 +210,11 @@ PHRASES.forEach(phrase => {
 });
 
 // ---------- Segure para falar ----------
-// O microfone fica aberto por 1 minuto depois de usar, para a próxima fala começar na hora
+// O microfone é fechado logo depois de cada fala: aberto, o iPhone põe o bluetooth em modo
+// "ligação" e o som do bingo pode sair mudo ou no alto-falante de ouvido
 const MAX_TALK_MS = 30000;
 const MIN_TALK_MS = 500;
-const talk = { stream: null, media: null, chunks: [], startedAt: 0, wantStop: false, releaseTimer: null, maxTimer: null };
+const talk = { stream: null, media: null, chunks: [], startedAt: 0, wantStop: false, maxTimer: null };
 
 function setTalkButton(stateName, label) {
   els.btnTalk.classList.toggle('arming', stateName === 'arming');
@@ -222,7 +232,6 @@ function pickMimeType() {
 }
 
 async function getMicrophone() {
-  clearTimeout(talk.releaseTimer);
   if (talk.stream?.getTracks().some(track => track.readyState === 'live')) return talk.stream;
   talk.stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -230,12 +239,9 @@ async function getMicrophone() {
   return talk.stream;
 }
 
-function releaseMicrophoneLater() {
-  clearTimeout(talk.releaseTimer);
-  talk.releaseTimer = setTimeout(() => {
-    talk.stream?.getTracks().forEach(track => track.stop());
-    talk.stream = null;
-  }, 60000);
+function releaseMicrophone() {
+  talk.stream?.getTracks().forEach(track => track.stop());
+  talk.stream = null;
 }
 
 async function startTalk(event) {
@@ -261,7 +267,7 @@ async function startTalk(event) {
   // Soltou antes de o microfone ficar pronto (ex.: durante o pedido de permissão)
   if (talk.wantStop) {
     resetTalkButton();
-    releaseMicrophoneLater();
+    releaseMicrophone();
     toast('🎙️ Microfone liberado! Agora segure o botão enquanto fala');
     return;
   }
@@ -292,7 +298,7 @@ async function sendTalk(mimeType) {
   const blob = new Blob(talk.chunks, { type: mimeType || 'audio/mp4' });
   talk.media = null;
   talk.chunks = [];
-  releaseMicrophoneLater();
+  releaseMicrophone();
 
   if (duration < MIN_TALK_MS) {
     resetTalkButton();
@@ -349,7 +355,7 @@ els.optLocal.addEventListener('change', () => setLocalSound(els.optLocal.checked
 // Som local salvo como ligado: o navegador só libera depois do primeiro toque
 document.addEventListener('pointerdown', async event => {
   if (event.target.closest?.('.target-here')) return; // o próprio botão cuida disso
-  if (els.optLocal.checked && !announcer.enabled) {
+  if (els.optLocal.checked && (!announcer.enabled || announcer.blocked)) {
     try {
       await announcer.enable();
       socket?.emit('speaker', { on: true });
@@ -449,6 +455,11 @@ function connectSocket() {
     render();
   });
 
+  // Voltou para o app depois de bloquear a tela ou trocar de app: reconecta na hora
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !socket.connected) socket.connect();
+  });
+
   socket.on('speakers', data => {
     if (data.room !== room) return;
     speakerCount = data.count;
@@ -460,7 +471,7 @@ function connectSocket() {
 
   socket.on('announce', event => {
     // Este celular toca tudo, mesmo quando o envio é só para algumas caixas
-    if (event.room === room && announcer.enabled) announcer.handle({ ...event, targets: null });
+    playHere(event);
   });
 }
 
