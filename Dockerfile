@@ -5,6 +5,9 @@ ENV NODE_ENV=production \
     PORT=3000 \
     STATE_FILE=/data/game-state.json
 
+# ffmpeg converte as gravações do celular (mp4/webm) para MP3 com volume normalizado
+RUN apk add --no-cache ffmpeg
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 

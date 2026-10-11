@@ -38,6 +38,13 @@ falar "Ainda não saiu nenhum número." "$OUT/nenhum.mp3"
 falar "Vamos começar um novo jogo. Boa sorte a todos!" "$OUT/novo-jogo.mp3"
 falar "Olá! Esta é a voz que vai cantar os números do bingo." "$OUT/teste.mp3"
 
+# Respostas rápidas do controle (ids iguais aos de PHRASES em server.js)
+falar "Sim, já saiu!" "$OUT/sim-saiu.mp3"
+falar "Não, ainda não saiu." "$OUT/nao-saiu.mp3"
+falar "Atenção! Vamos conferir a cartela." "$OUT/conferir.mp3"
+falar "Temos um vencedor! Parabéns!" "$OUT/vencedor.mp3"
+falar "Um momento, por favor." "$OUT/aguarde.mp3"
+
 # Sinal curto antes de cada número (igual para todas as vozes)
 if [ ! -f "$ROOT/sinal.mp3" ]; then
   ffmpeg -y -loglevel error \

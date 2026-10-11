@@ -1,6 +1,9 @@
 const express = require('express');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
 const { Server } = require('socket.io');
 const path = require('path');
 const QRCode = require('qrcode');
@@ -32,6 +35,12 @@ if (IS_PRODUCTION && (!ADMIN_PASS || ADMIN_PASS === 'admin' || ADMIN_PASS.length
 const ROOM_REGEX = /^[a-zA-Z0-9_]{1,50}$/;
 // Pastas de áudio em public/audio/ (a primeira é a padrão)
 const VOICES = ['francisca', 'antonio', 'thalita'];
+// Respostas rápidas (arquivos public/audio/<voz>/<id>.mp3)
+const PHRASES = ['sim-saiu', 'nao-saiu', 'conferir', 'vencedor', 'aguarde'];
+// Gravações feitas no celular: ficam só na memória, as mais recentes
+const MAX_CLIPS = 30;
+const clips = new Map(); // id -> { buffer, type }
+const lastClipByRoom = new Map(); // sala -> url
 
 // Atrás do Traefik/Cloudflare: confia no X-Forwarded-Proto para saber que é https
 app.set('trust proxy', true);
@@ -117,6 +126,37 @@ async function broadcastSpeakers(name) {
   io.to(name).emit('speakers', { room: name, count });
 }
 
+// Converte a gravação do celular (mp4 no iPhone, webm no Android) para MP3,
+// corta o silêncio do começo e normaliza o volume para ficar parecido com a voz da IA
+function convertClip(buffer) {
+  return new Promise((resolve, reject) => {
+    const tmp = path.join(os.tmpdir(), `clip-${crypto.randomUUID()}`);
+    fs.writeFileSync(tmp, buffer);
+    const ffmpeg = spawn('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-i', tmp, '-vn',
+      '-af', 'highpass=f=80,silenceremove=start_periods=1:start_threshold=-50dB,loudnorm=I=-14:TP=-1.5:LRA=11',
+      '-ac', '1', '-ar', '44100', '-c:a', 'libmp3lame', '-q:a', '4', '-f', 'mp3', 'pipe:1'
+    ]);
+    const chunks = [];
+    let stderr = '';
+    ffmpeg.stdout.on('data', chunk => chunks.push(chunk));
+    ffmpeg.stderr.on('data', data => { stderr += data; });
+    ffmpeg.on('error', error => { fs.unlink(tmp, () => {}); reject(error); });
+    ffmpeg.on('close', code => {
+      fs.unlink(tmp, () => {});
+      if (code === 0 && chunks.length) resolve(Buffer.concat(chunks));
+      else reject(new Error(stderr.trim() || `ffmpeg saiu com código ${code}`));
+    });
+  });
+}
+
+function storeClip(buffer, type) {
+  const id = crypto.randomUUID();
+  clips.set(id, { buffer, type });
+  while (clips.size > MAX_CLIPS) clips.delete(clips.keys().next().value);
+  return `/api/clips/${id}`;
+}
+
 async function markNumber(name, number, repeat, res) {
   try {
     await gameState.drawNumber(name, number);
@@ -168,6 +208,15 @@ app.get('/api/info', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: 'Erro ao gerar QR code' });
   }
+});
+
+// Gravação do celular (id aleatório, guardada só na memória)
+app.get('/api/clips/:id', (req, res) => {
+  const clip = clips.get(req.params.id);
+  if (!clip) return res.status(404).end();
+  res.set('Content-Type', clip.type);
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(clip.buffer);
 });
 
 // Listar todas as salas
@@ -250,6 +299,26 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, (req, res) =>
     announce(name, { kind: 'recap', numbers: [...room.drawnNumbers].sort((a, b) => a - b) });
   } else if (mode === 'stop') {
     announce(name, { kind: 'stop' });
+  } else if (mode === 'phrase') {
+    if (!PHRASES.includes(req.body.phrase)) {
+      return res.status(400).json({ success: false, error: 'Frase inválida', code: 'INVALID_PHRASE' });
+    }
+    announce(name, { kind: 'phrase', phrase: req.body.phrase });
+  } else if (mode === 'check') {
+    // "Já saiu o 32?" — fala o número e responde, sem marcar nada
+    const number = parseInt(req.body.number, 10);
+    if (!(number >= 1 && number <= 75)) {
+      return res.status(400).json({ success: false, error: 'Número deve ser entre 1 e 75', code: 'INVALID_NUMBER' });
+    }
+    const drawn = room.drawnNumbers.includes(number);
+    announce(name, { kind: 'check', number, drawn });
+    return res.json({ success: true, number, drawn });
+  } else if (mode === 'last-clip') {
+    const url = lastClipByRoom.get(name);
+    if (!url || !clips.has(url.split('/').pop())) {
+      return res.status(400).json({ success: false, error: 'Nenhuma gravação para repetir', code: 'NO_CLIP' });
+    }
+    announce(name, { kind: 'clip', url });
   } else {
     const number = mode === 'number' ? parseInt(req.body.number, 10) : room.currentNumber;
     if (!room.drawnNumbers.includes(number)) {
@@ -260,6 +329,29 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, (req, res) =>
 
   res.json({ success: true });
 });
+
+// Gravação de voz do celular: converte e manda todo mundo tocar
+app.post('/api/rooms/:name/clip', adminAuth, validateRoomName,
+  express.raw({ type: ['audio/*', 'video/*', 'application/octet-stream'], limit: '10mb' }),
+  async (req, res) => {
+    const { name } = req.params;
+    if (!Buffer.isBuffer(req.body) || req.body.length < 1000) {
+      return res.status(400).json({ success: false, error: 'Gravação vazia ou curta demais', code: 'EMPTY_CLIP' });
+    }
+
+    let url;
+    try {
+      url = storeClip(await convertClip(req.body), 'audio/mpeg');
+    } catch (error) {
+      // Sem ffmpeg (ou falha na conversão): toca o arquivo original mesmo
+      console.warn('Conversão da gravação falhou, usando original:', error.message);
+      url = storeClip(req.body, (req.get('Content-Type') || 'audio/mp4').split(';')[0]);
+    }
+
+    lastClipByRoom.set(name, url);
+    announce(name, { kind: 'clip', url });
+    res.json({ success: true, url });
+  });
 
 // Resetar sala (novo jogo)
 app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, async (req, res) => {

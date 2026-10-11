@@ -10,7 +10,14 @@ const COLUMNS = [
   { letter: 'O', min: 61, max: 75 }
 ];
 
-const EXTRA_CLIPS = ['recap-inicio', 'recap-fim', 'nenhum', 'novo-jogo', 'teste'];
+const PHRASES = [
+  { id: 'sim-saiu', label: '✅ Sim, já saiu!' },
+  { id: 'nao-saiu', label: '❌ Ainda não saiu' },
+  { id: 'conferir', label: '🔎 Vamos conferir' },
+  { id: 'vencedor', label: '🏆 Temos vencedor!' },
+  { id: 'aguarde', label: '✋ Um momento' }
+];
+const EXTRA_CLIPS = ['recap-inicio', 'recap-fim', 'nenhum', 'novo-jogo', 'teste', ...PHRASES.map(p => p.id)];
 
 // Vozes disponíveis (pastas em public/audio/, geradas por scripts/gerar-audios.sh)
 const VOICES = [
@@ -133,6 +140,7 @@ class Announcer {
   }
 
   clipUrl(clip) {
+    if (clip.startsWith('/')) return clip; // gravação do celular
     return clip === 'sinal' ? '/audio/sinal.mp3' : `/audio/${this.voice}/${clip}.mp3`;
   }
 
@@ -198,6 +206,10 @@ class Announcer {
     else if (event.kind === 'recap') this.recap(event.numbers || []);
     else if (event.kind === 'new-game') this.play(['novo-jogo']);
     else if (event.kind === 'voice-test') this.play(['teste']);
+    else if (event.kind === 'phrase') this.play([event.phrase]);
+    else if (event.kind === 'check') {
+      this.play(['sinal', { wait: 150 }, String(event.number), { wait: 300 }, event.drawn ? 'sim-saiu' : 'nao-saiu']);
+    } else if (event.kind === 'clip') this.play(['sinal', { wait: 150 }, event.url]);
     else if (event.kind === 'stop') this.stop();
   }
 }

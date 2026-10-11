@@ -27,6 +27,12 @@ const els = {
   optRepeat: document.getElementById('opt-repeat'),
   optLocal: document.getElementById('opt-local'),
   optVoice: document.getElementById('opt-voice'),
+  btnTalk: document.getElementById('btn-talk'),
+  btnTalkRepeat: document.getElementById('btn-talk-repeat'),
+  phrases: document.getElementById('phrases'),
+  modeMark: document.getElementById('mode-mark'),
+  modeCheck: document.getElementById('mode-check'),
+  hint: document.getElementById('hint'),
   displayLink: document.getElementById('display-link'),
   toast: document.getElementById('toast')
 };
@@ -35,6 +41,7 @@ let credentials = null;
 let socket = null;
 let state = { drawnNumbers: [], currentNumber: null };
 let speakerCount = 0;
+let padMode = 'mark'; // 'mark' marca o número; 'check' só responde se já saiu
 const announcer = new Announcer();
 const cells = buildBoard(els.pad, { asButtons: true, onSelect: selectNumber });
 
@@ -58,14 +65,16 @@ function authHeader(user, pass) {
   return 'Basic ' + btoa(unescape(encodeURIComponent(`${user}:${pass}`)));
 }
 
+// body pode ser objeto (vai como JSON) ou Blob (gravação de áudio)
 async function api(action, body = {}) {
+  const isBlob = body instanceof Blob;
   const response = await fetch(`/api/rooms/${room}/${action}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': isBlob ? (body.type.split(';')[0] || 'application/octet-stream') : 'application/json',
       Authorization: authHeader(credentials.user, credentials.pass)
     },
-    body: JSON.stringify(body)
+    body: isBlob ? body : JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
 
@@ -106,7 +115,12 @@ async function run(button, task) {
 // ---------- Ações ----------
 async function selectNumber(number) {
   const cell = cells[number];
-  if (state.drawnNumbers.includes(number)) {
+  if (padMode === 'check') {
+    await run(cell, async () => {
+      const data = await api('announce', { mode: 'check', number });
+      toast(`${letterFor(number)} ${number}: ${data.drawn ? '✅ já saiu' : '❌ ainda não saiu'}`);
+    });
+  } else if (state.drawnNumbers.includes(number)) {
     await run(cell, async () => {
       await api('announce', { mode: 'number', number, repeat: 1 });
       toast(`🔁 Falando ${letterFor(number)} ${number}`);
@@ -145,6 +159,150 @@ els.btnReset.addEventListener('click', () => run(els.btnReset, async () => {
 }));
 
 els.btnLogout.addEventListener('click', logout);
+
+// ---------- Modo da grade: marcar ou conferir ----------
+const HINTS = {
+  mark: 'Toque no número que saiu do globo. Tocar num número já marcado fala ele de novo.',
+  check: '🔎 Modo conferir: toque no número que perguntaram e a caixa responde se já saiu. Nada é marcado.'
+};
+function setPadMode(mode) {
+  padMode = mode;
+  els.modeMark.classList.toggle('active', mode === 'mark');
+  els.modeCheck.classList.toggle('active', mode === 'check');
+  els.pad.classList.toggle('checking', mode === 'check');
+  els.hint.textContent = HINTS[mode];
+  els.hint.classList.toggle('hint-check', mode === 'check');
+}
+els.modeMark.addEventListener('click', () => setPadMode('mark'));
+els.modeCheck.addEventListener('click', () => setPadMode('check'));
+
+// ---------- Respostas rápidas ----------
+PHRASES.forEach(phrase => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-phrase';
+  button.textContent = phrase.label;
+  button.addEventListener('click', () => run(button, () => api('announce', { mode: 'phrase', phrase: phrase.id })));
+  els.phrases.appendChild(button);
+});
+
+// ---------- Segure para falar ----------
+// O microfone fica aberto por 1 minuto depois de usar, para a próxima fala começar na hora
+const MAX_TALK_MS = 30000;
+const MIN_TALK_MS = 500;
+const talk = { stream: null, media: null, chunks: [], startedAt: 0, wantStop: false, releaseTimer: null, maxTimer: null };
+
+function setTalkButton(stateName, label) {
+  els.btnTalk.classList.toggle('arming', stateName === 'arming');
+  els.btnTalk.classList.toggle('recording', stateName === 'recording');
+  els.btnTalk.textContent = label;
+}
+function resetTalkButton() {
+  els.btnTalk.disabled = false;
+  setTalkButton('idle', '🎙️ Segure para falar');
+}
+
+function pickMimeType() {
+  return ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
+    .find(type => MediaRecorder.isTypeSupported?.(type)) || '';
+}
+
+async function getMicrophone() {
+  clearTimeout(talk.releaseTimer);
+  if (talk.stream?.getTracks().some(track => track.readyState === 'live')) return talk.stream;
+  talk.stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+  return talk.stream;
+}
+
+function releaseMicrophoneLater() {
+  clearTimeout(talk.releaseTimer);
+  talk.releaseTimer = setTimeout(() => {
+    talk.stream?.getTracks().forEach(track => track.stop());
+    talk.stream = null;
+  }, 60000);
+}
+
+async function startTalk(event) {
+  event.preventDefault();
+  if (talk.media || els.btnTalk.disabled) return;
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    toast('Este navegador não grava áudio aqui (precisa abrir pelo https)', true);
+    return;
+  }
+  els.btnTalk.setPointerCapture?.(event.pointerId);
+  talk.wantStop = false;
+  setTalkButton('arming', '⏳ Preparando…');
+
+  let stream;
+  try {
+    stream = await getMicrophone();
+  } catch (error) {
+    resetTalkButton();
+    toast('Microfone bloqueado. Libere nas configurações do navegador', true);
+    return;
+  }
+
+  // Soltou antes de o microfone ficar pronto (ex.: durante o pedido de permissão)
+  if (talk.wantStop) {
+    resetTalkButton();
+    releaseMicrophoneLater();
+    toast('🎙️ Microfone liberado! Agora segure o botão enquanto fala');
+    return;
+  }
+
+  const mimeType = pickMimeType();
+  const media = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  talk.media = media;
+  talk.chunks = [];
+  talk.startedAt = 0;
+  media.ondataavailable = e => { if (e.data.size) talk.chunks.push(e.data); };
+  media.onstart = () => {
+    talk.startedAt = Date.now();
+    setTalkButton('recording', '🔴 Gravando… solte para enviar');
+  };
+  media.onstop = () => sendTalk(media.mimeType || mimeType);
+  media.start();
+  talk.maxTimer = setTimeout(stopTalk, MAX_TALK_MS);
+}
+
+function stopTalk() {
+  talk.wantStop = true;
+  clearTimeout(talk.maxTimer);
+  if (talk.media && talk.media.state !== 'inactive') talk.media.stop();
+}
+
+async function sendTalk(mimeType) {
+  const duration = talk.startedAt ? Date.now() - talk.startedAt : 0;
+  const blob = new Blob(talk.chunks, { type: mimeType || 'audio/mp4' });
+  talk.media = null;
+  talk.chunks = [];
+  releaseMicrophoneLater();
+
+  if (duration < MIN_TALK_MS) {
+    resetTalkButton();
+    toast('Segure o botão enquanto fala', true);
+    return;
+  }
+
+  els.btnTalk.disabled = true;
+  setTalkButton('idle', '📤 Enviando…');
+  try {
+    await api('clip', blob);
+    toast('📢 Sua fala está tocando para todos');
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    resetTalkButton();
+  }
+}
+
+els.btnTalk.addEventListener('pointerdown', startTalk);
+els.btnTalk.addEventListener('pointerup', stopTalk);
+els.btnTalk.addEventListener('pointercancel', stopTalk);
+els.btnTalk.addEventListener('contextmenu', e => e.preventDefault());
+els.btnTalkRepeat.addEventListener('click', () => run(els.btnTalkRepeat, () => api('announce', { mode: 'last-clip' })));
 
 VOICES.forEach(voice => els.optVoice.add(new Option(voice.label, voice.id)));
 els.optVoice.addEventListener('change', () => run(els.optVoice, async () => {

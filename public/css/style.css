@@ -282,6 +282,52 @@ body {
 .admin-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
 
 .hint { color: var(--text-dim); font-size: 0.85rem; text-align: center; }
+.hint-check { color: #fde047; font-weight: 600; }
+
+.talk { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+.btn-talk {
+  min-height: 64px;
+  font-size: 1.2rem;
+  background: #0e7490;
+  border-color: #0e7490;
+  /* Segurar o botão no iPhone não pode abrir lupa/menu nem rolar a tela */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+.btn-talk:hover { background: #0e7490; }
+.btn-talk.arming { background: var(--warn); border-color: var(--warn); }
+.btn-talk.recording { background: var(--danger); border-color: var(--danger); animation: recording 1s infinite; }
+@keyframes recording { 50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0.35); } }
+
+.phrases { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.btn-phrase { min-height: 44px; font-size: 0.95rem; padding: 0.5rem; }
+.phrases .btn-phrase:last-child:nth-child(odd) { grid-column: span 2; }
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg-2);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+.mode-switch button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.mode-switch button.active { background: var(--bg-3); color: var(--text); }
+#mode-check.active { background: #a16207; color: #fff; }
+
+.pad.checking { outline: 3px dashed #fde047; outline-offset: 4px; border-radius: 12px; }
 
 .pad {
   grid-template-columns: repeat(5, 1fr);

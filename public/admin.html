@@ -47,7 +47,19 @@
       <button id="btn-stop" class="btn" type="button">⏹ Parar</button>
     </div>
 
-    <p class="hint">Ou toque no número que saiu do globo. Tocar num número já marcado fala ele de novo.</p>
+    <section class="talk">
+      <button id="btn-talk" class="btn btn-talk" type="button">🎙️ Segure para falar</button>
+      <button id="btn-talk-repeat" class="btn" type="button" aria-label="Repetir minha gravação" title="Repetir minha gravação">🔁</button>
+    </section>
+
+    <div id="phrases" class="phrases"></div>
+
+    <div class="mode-switch" role="group" aria-label="O que acontece ao tocar num número">
+      <button id="mode-mark" class="active" type="button">✅ Marcar sorteado</button>
+      <button id="mode-check" type="button">🔎 Conferir (já saiu?)</button>
+    </div>
+
+    <p id="hint" class="hint">Toque no número que saiu do globo. Tocar num número já marcado fala ele de novo.</p>
 
     <section id="pad" class="board pad" aria-label="Números"></section>
 
