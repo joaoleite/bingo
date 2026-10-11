@@ -1,0 +1,8 @@
+node_modules
+.git
+.claude
+.playwright-mcp
+game-state.json
+*.md
+scripts
+.DS_Store

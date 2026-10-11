@@ -1,0 +1,26 @@
+# Deploy no Coolify (build pack: Docker Compose), domínio só no serviço "app".
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      STATE_FILE: /data/game-state.json
+      # Segredos vêm das Environment Variables do Coolify. Sem ADMIN_PASS forte, o app não sobe.
+      ADMIN_USER: '${ADMIN_USER:-admin}'
+      ADMIN_PASS: '${ADMIN_PASS}'
+      PUBLIC_URL: '${PUBLIC_URL:-https://bingo.jota.qzz.io}'
+    volumes:
+      # Volume nomeado: o jogo em andamento sobrevive a redeploy
+      - dados-bingo:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Sem "ports:": quem expõe é o Traefik do Coolify
+
+volumes:
+  dados-bingo:

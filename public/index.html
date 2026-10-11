@@ -3,94 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bingo - Sala de Jogo</title>
+  <title>Bingo da Família</title>
   <link rel="stylesheet" href="/css/style.css">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎱</text></svg>">
 </head>
-<body>
-  <div class="container">
-    <header>
-      <h1>🎱 Bingo</h1>
-      <div id="connection-status" class="status disconnected">
-        <span class="status-dot"></span>
-        <span class="status-text">Desconectado</span>
-      </div>
-    </header>
+<body class="display-page">
+  <header class="topbar">
+    <h1>🎱 Bingo</h1>
+    <div class="topbar-info">
+      <span><strong id="drawn-count">0</strong> de 75 sorteados</span>
+      <span id="connection" class="conn disconnected" title="Sem conexão"></span>
+      <button id="btn-sound" class="btn btn-ghost" type="button">🔇 Som desligado</button>
+      <button id="btn-fullscreen" class="btn btn-ghost" type="button">⛶ Tela cheia</button>
+    </div>
+  </header>
 
-    <main>
-      <!-- Seleção de Sala -->
-      <section id="room-selection" class="section">
-        <h2>Escolha uma Sala</h2>
-        <div class="room-grid" id="room-grid">
-          <!-- Salas serão carregadas aqui -->
-        </div>
-      </section>
+  <main class="display-main">
+    <section class="now-panel">
+      <p class="label">Último número</p>
+      <div id="ball" class="ball empty"><span class="ball-number">–</span></div>
+      <p class="label">Anteriores</p>
+      <div id="recent" class="recent"></div>
+    </section>
 
-      <!-- Jogo -->
-      <section id="game-area" class="section hidden">
-        <div class="game-header">
-          <button id="btn-back" class="btn btn-secondary">← Voltar</button>
-          <h2 id="current-room-name">Sala</h2>
-          <div class="room-info">
-            <span id="drawn-count">0</span> números sorteados
-          </div>
-        </div>
+    <section id="board" class="board" aria-label="Números sorteados"></section>
+  </main>
 
-        <div class="bingo-board" id="bingo-board">
-          <!-- Grid 5x5 B-I-N-G-O -->
-          <div class="bingo-header">
-            <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-          </div>
-          <div class="bingo-grid" id="bingo-grid">
-            <!-- Números serão renderizados aqui -->
-          </div>
-        </div>
+  <aside id="connect" class="connect-card" hidden>
+    <img id="admin-qr" alt="QR code do controle">
+    <div>
+      <strong>Controle no celular</strong>
+      <span id="admin-url"></span>
+    </div>
+  </aside>
 
-        <div class="current-number-display" id="current-number-display">
-          <div class="current-number" id="current-number">-</div>
-          <div class="current-label">Último número</div>
-        </div>
-
-        <div class="drawn-numbers-list" id="drawn-numbers-list">
-          <h3>Sorteados</h3>
-          <div class="numbers-grid" id="numbers-grid">
-            <!-- Números sorteados aparecem aqui -->
-          </div>
-        </div>
-      </section>
-
-      <!-- Admin Panel -->
-      <section id="admin-panel" class="section hidden">
-        <h2>Painel Administrativo</h2>
-        <div class="admin-login" id="admin-login">
-          <input type="password" id="admin-password" placeholder="Senha admin">
-          <button id="btn-login" class="btn btn-primary">Entrar</button>
-        </div>
-        <div id="admin-controls" class="hidden">
-          <div class="admin-room-selector">
-            <label>Sala:</label>
-            <select id="admin-room-select"></select>
-          </div>
-          <div class="admin-actions">
-            <button id="btn-draw" class="btn btn-primary btn-large">🎱 Sortear Número</button>
-            <button id="btn-reset" class="btn btn-danger">Resetar Sala</button>
-          </div>
-          <div class="admin-options">
-            <label>
-              <input type="checkbox" id="show-all-toggle">
-              Mostrar todos os números
-            </label>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <p>Bingo Client-Server v1.0.0</p>
-    </footer>
+  <div id="sound-overlay" class="overlay">
+    <div class="overlay-card">
+      <p class="overlay-emoji">🔊</p>
+      <h2>Esta tela vai falar os números</h2>
+      <p>Ligue a caixa de som neste aparelho e clique no botão abaixo.</p>
+      <button id="btn-enable-sound" class="btn btn-primary btn-big" type="button">Ativar som</button>
+      <button id="btn-no-sound" class="btn btn-ghost" type="button">Só mostrar, sem som</button>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/display.js"></script>
 </body>
 </html>

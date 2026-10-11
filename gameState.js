@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const STATE_FILE = path.join(__dirname, 'game-state.json');
+// Em produção aponta para um volume (STATE_FILE=/data/game-state.json) para sobreviver ao redeploy
+const STATE_FILE = process.env.STATE_FILE || path.join(__dirname, 'game-state.json');
+fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
 
 // Mutex simples para evitar race conditions
 class Mutex {
@@ -23,8 +25,9 @@ class Mutex {
 
     release() {
         if (this.queue.length > 0) {
+            // Passa a vez para o próximo da fila, entregando a função de liberar
             const resolve = this.queue.shift();
-            resolve();
+            resolve(() => this.release());
         } else {
             this.locked = false;
         }
@@ -120,6 +123,20 @@ class GameState {
 
             this.save();
             return state;
+        } finally {
+            release();
+        }
+    }
+
+    async undo(roomName) {
+        const release = await mutex.acquire();
+        try {
+            const state = this._getRoomState(roomName);
+            const removed = state.drawnNumbers.pop() || null;
+            state.currentNumber = state.drawnNumbers[state.drawnNumbers.length - 1] || null;
+            state.lastActivity = Date.now();
+            this.save();
+            return { state, removed };
         } finally {
             release();
         }
