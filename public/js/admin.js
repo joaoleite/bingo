@@ -54,8 +54,13 @@ const announcer = new Announcer({
 });
 
 // Toca neste celular o que o servidor anunciou (resposta do botão ou websocket; o id evita repetir)
-function playHere(event) {
+// Diagnóstico temporário: cada passo do som do controle vai para o log do servidor
+announcer.trace = message => socket?.emit('client-log', { message });
+
+function playHere(event, via) {
   if (!event || event.room !== room || !els.optLocal.checked) return;
+  const label = event.number ? `${event.kind} ${event.number}` : event.kind;
+  announcer.trace(`recebeu ${label} via ${via} (som ${announcer.enabled ? 'ok' : 'off'}${announcer.seen.includes(event.id) ? ', repetido' : ''}, tela ${document.visibilityState})`);
   if (!announcer.enabled) {
     socket?.emit('client-log', { message: `anúncio ${event.kind} sem som liberado no controle` });
     return;
@@ -110,7 +115,7 @@ async function api(action, body = {}) {
     throw new Error('Sessão expirada, entre de novo');
   }
   if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao falar com o servidor');
-  playHere(data.announce);
+  playHere(data.announce, 'resposta');
   return data;
 }
 
@@ -477,7 +482,7 @@ function connectSocket() {
 
   socket.on('announce', event => {
     // Este celular toca tudo, mesmo quando o envio é só para algumas caixas
-    playHere(event);
+    playHere(event, 'websocket');
   });
 }
 

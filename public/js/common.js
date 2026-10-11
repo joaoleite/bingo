@@ -150,7 +150,11 @@ class Announcer {
     this.blocked = false;
     this.seen = [];
 
-    this.audio.addEventListener('ended', () => this.next());
+    this.audio.addEventListener('ended', () => {
+      this.trace?.(`terminou ${this.current} (${this.audio.duration?.toFixed(1)}s)`);
+      this.next();
+    });
+    this.audio.addEventListener('playing', () => this.trace?.(`tocando ${this.current}`));
     this.audio.addEventListener('error', () => {
       if (this.audio.getAttribute('src')) this.onLog?.(`erro no arquivo ${this.audio.getAttribute('src')}: código ${this.audio.error?.code}`);
       this.next();
@@ -237,6 +241,7 @@ class Announcer {
     }
 
     this.onClip?.(item);
+    this.current = item;
     this.audio.src = this.clipUrl(item);
     this.audio.play().catch(error => {
       if (error.name === 'NotAllowedError') {
