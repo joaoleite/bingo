@@ -49,8 +49,39 @@ app.set('trust proxy', true);
 // Middleware
 app.use(express.json());
 // Áudios não mudam durante o jogo: cache longo para não baixar de novo a cada número
+// ---------- Páginas com versão nos arquivos ----------
+// O Cloudflare manda o navegador guardar .js/.css por 4 horas. Para o iPhone pegar o código
+// novo a cada deploy, as páginas pedem /js/admin.js?v=<hash do conteúdo> e nunca ficam em cache.
+function assetVersion() {
+  const hash = crypto.createHash('sha1');
+  ['js', 'css'].forEach(dir => {
+    const folder = path.join(__dirname, 'public', dir);
+    fs.readdirSync(folder).sort().forEach(file => hash.update(fs.readFileSync(path.join(folder, file))));
+  });
+  return hash.digest('hex').slice(0, 10);
+}
+const ASSET_VERSION = assetVersion();
+
+function renderPage(file) {
+  return fs.readFileSync(path.join(__dirname, 'public', file), 'utf8')
+    .replace(/(src|href)="\/(js|css)\/([^"?]+)"/g, `$1="/$2/$3?v=${ASSET_VERSION}"`)
+    .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">`);
+}
+const PAGES = IS_PRODUCTION
+  ? { display: renderPage('index.html'), admin: renderPage('admin.html') }
+  : null;
+
+function sendPage(name, file) {
+  return (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(PAGES ? PAGES[name] : renderPage(file));
+  };
+}
+app.get(['/', '/index.html'], sendPage('display', 'index.html'));
+app.get(['/admin', '/admin.html'], sendPage('admin', 'admin.html'));
+
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), { maxAge: '7d' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // Autenticação básica para rotas admin (sem challenge para o navegador não abrir o pop-up nativo)
 const adminAuth = basicAuth({
@@ -213,13 +244,9 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: Date.now(),
+    version: ASSET_VERSION,
     uptime: process.uptime()
   });
-});
-
-// Controle do sorteio (celular)
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Verifica credenciais do admin

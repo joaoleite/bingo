@@ -417,3 +417,5 @@ body {
   text-align: center;
 }
 .toast-error { background: #fecaca; color: #7f1d1d; }
+
+.version { text-align: center; font-size: 0.75rem; color: var(--text-dim); margin: 0; }

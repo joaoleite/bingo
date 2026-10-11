@@ -456,6 +456,9 @@ function connectSocket() {
   socket.on('connect', () => {
     setConnection(els.connection, true);
     socket.emit('join-room', { roomName: room, speaker: announcer.enabled, deviceId: DEVICE_ID, deviceName: LOCAL_DEVICE_NAME });
+    const version = document.querySelector('meta[name="bingo-version"]')?.content;
+    const ios = navigator.userAgent.match(/OS (\d+_\d+)/)?.[1]?.replace('_', '.') || '';
+    socket.emit('client-log', { message: `controle conectou: versão ${version}, som ${announcer.enabled ? 'ok' : els.optLocal.checked ? 'esperando toque' : 'off'}${ios ? `, iOS ${ios}` : ''}` });
   });
   socket.on('disconnect', () => setConnection(els.connection, false));
 
@@ -536,6 +539,8 @@ els.login.addEventListener('submit', async event => {
     (prefs.targets || []).forEach(t => { if (t?.id) selectedTargets.set(t.id, t.name || 'Caixa'); });
   }
   if (room !== 'bingo') els.displayLink.href = `/?sala=${room}`;
+  const version = document.querySelector('meta[name="bingo-version"]')?.content;
+  document.getElementById('version').textContent = `versão ${version || 'desconhecida'}`;
   renderSpeakers();
 
   const saved = readStore(CREDENTIALS_KEY);

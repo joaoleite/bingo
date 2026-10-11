@@ -121,13 +121,16 @@ function setDeviceName(name) {
 }
 
 // Mantém a tela acesa (só funciona em localhost/https; nos outros casos ignora)
+let wakeLockSentinel = null;
 async function keepScreenOn() {
   try {
-    if ('wakeLock' in navigator && document.visibilityState === 'visible') {
-      await navigator.wakeLock.request('screen');
+    if ('wakeLock' in navigator && document.visibilityState === 'visible' && (!wakeLockSentinel || wakeLockSentinel.released)) {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
     }
-  } catch (e) { /* sem suporte */ }
+  } catch (e) { /* sem suporte ou sem toque ainda */ }
 }
+// No iPhone o pedido pode precisar de um toque; tenta de novo a cada toque até conseguir
+document.addEventListener('pointerdown', keepScreenOn);
 document.addEventListener('visibilitychange', keepScreenOn);
 
 // ============================================
@@ -150,8 +153,12 @@ class Announcer {
     this.blocked = false;
     this.seen = [];
 
+    this.lastSoundAt = 0;
+    this.watchdog = null;
+
     this.audio.addEventListener('ended', () => {
       this.trace?.(`terminou ${this.current} (${this.audio.duration?.toFixed(1)}s)`);
+      this.lastSoundAt = Date.now();
       this.next();
     });
     this.audio.addEventListener('playing', () => this.trace?.(`tocando ${this.current}`));
@@ -161,7 +168,6 @@ class Announcer {
     });
   }
 
-  // Precisa ser chamado dentro de um clique/toque
   // Precisa ser chamado dentro de um toque. Marca como ligado na hora, para um anúncio que
   // chegue enquanto o iPhone ainda libera o áudio não ser descartado.
   // Se havia fala pendente (bloqueio), ela continua quando o sinal terminar.
@@ -200,11 +206,12 @@ class Announcer {
 
   clipUrl(clip) {
     if (clip.startsWith('/')) return clip; // gravação do celular
-    return clip === 'sinal' ? '/audio/sinal.mp3' : `/audio/${this.voice}/${clip}.mp3`;
+    if (clip === 'sinal' || clip === 'silencio') return `/audio/${clip}.mp3`;
+    return `/audio/${this.voice}/${clip}.mp3`;
   }
 
   preloadAll() {
-    const clips = ['sinal', ...EXTRA_CLIPS];
+    const clips = ['sinal', 'silencio', ...EXTRA_CLIPS];
     for (let n = 1; n <= 75; n++) clips.push(String(n));
     clips.forEach(clip => fetch(this.clipUrl(clip)).catch(() => {}));
   }
@@ -212,6 +219,7 @@ class Announcer {
   stop() {
     this.queue = [];
     clearTimeout(this.timer);
+    clearTimeout(this.watchdog);
     this.audio.pause();
     this.busy = false;
     this.onClip?.(null);
@@ -219,13 +227,17 @@ class Announcer {
 
   play(items) {
     if (!this.enabled) return;
+    const idle = !this.busy && Date.now() - this.lastSoundAt > 4000;
     this.stop();
-    this.queue = items;
+    // Caixa bluetooth parada há alguns segundos "come" o começo do som: um silêncio curto
+    // antes dá tempo de ela acordar sem cortar o plim nem o número
+    this.queue = idle ? ['silencio', ...items] : items;
     this.next();
   }
 
   next() {
     clearTimeout(this.timer);
+    clearTimeout(this.watchdog);
     const item = this.queue.shift();
 
     if (item === undefined) {
@@ -240,12 +252,18 @@ class Announcer {
       return;
     }
 
-    this.onClip?.(item);
+    this.onClip?.(item === 'silencio' ? null : item);
     this.current = item;
     this.audio.src = this.clipUrl(item);
+    // Se o iPhone nunca avisar que terminou, segue a fila em vez de travar para sempre
+    this.watchdog = setTimeout(() => {
+      this.onLog?.(`travou em ${item}, pulando`);
+      this.next();
+    }, item.startsWith('/') ? 35000 : 10000);
     this.audio.play().catch(error => {
       if (error.name === 'NotAllowedError') {
         // iPhone travou o som (tela bloqueada, ligação, outro app): guarda e espera um toque
+        clearTimeout(this.watchdog);
         this.queue.unshift(item);
         this.busy = false;
         this.blocked = true;
