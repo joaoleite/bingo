@@ -55,7 +55,12 @@ const announcer = new Announcer({
 
 // Toca neste celular o que o servidor anunciou (resposta do botão ou websocket; o id evita repetir)
 function playHere(event) {
-  if (event && event.room === room && announcer.enabled) announcer.handle({ ...event, targets: null });
+  if (!event || event.room !== room || !els.optLocal.checked) return;
+  if (!announcer.enabled) {
+    socket?.emit('client-log', { message: `anúncio ${event.kind} sem som liberado no controle` });
+    return;
+  }
+  announcer.handle({ ...event, targets: null });
 }
 const cells = buildBoard(els.pad, { asButtons: true, onSelect: selectNumber });
 
@@ -405,7 +410,8 @@ function renderTargets() {
   const here = document.createElement('button');
   here.type = 'button';
   here.className = `target-chip target-here${announcer.enabled ? ' active' : ''}`;
-  here.textContent = announcer.enabled ? '📱 Este celular' : '📱 Este celular (mudo)';
+  here.textContent = announcer.enabled ? '📱 Este celular'
+    : els.optLocal.checked ? '📱 Este celular (toque na tela)' : '📱 Este celular (mudo)';
   here.addEventListener('click', () => setLocalSound(!announcer.enabled));
   els.targetChips.appendChild(here);
   if (!devices.length) return;

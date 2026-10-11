@@ -151,20 +151,34 @@ class Announcer {
     this.seen = [];
 
     this.audio.addEventListener('ended', () => this.next());
-    this.audio.addEventListener('error', () => this.next());
+    this.audio.addEventListener('error', () => {
+      if (this.audio.getAttribute('src')) this.onLog?.(`erro no arquivo ${this.audio.getAttribute('src')}: código ${this.audio.error?.code}`);
+      this.next();
+    });
   }
 
   // Precisa ser chamado dentro de um clique/toque
-  // Se havia fala pendente por bloqueio, ela continua quando o sinal terminar
+  // Precisa ser chamado dentro de um toque. Marca como ligado na hora, para um anúncio que
+  // chegue enquanto o iPhone ainda libera o áudio não ser descartado.
+  // Se havia fala pendente (bloqueio), ela continua quando o sinal terminar.
   async enable() {
+    const wasEnabled = this.enabled;
+    // Bloqueado: o item travado está no src e também no início da fila
     const resuming = this.blocked && this.queue.length > 0;
-    this.audio.src = '/audio/sinal.mp3';
-    await this.audio.play();
-    this.blocked = false;
-    if (!this.enabled) {
-      this.enabled = true;
-      this.preloadAll();
+    if (resuming) this.queue.shift();
+    this.enabled = true;
+    if (!resuming) this.audio.src = '/audio/sinal.mp3';
+    try {
+      await this.audio.play();
+    } catch (error) {
+      // AbortError = outro som começou no meio; o áudio já ficou liberado
+      if (error.name !== 'AbortError') {
+        this.enabled = wasEnabled;
+        throw error;
+      }
     }
+    this.blocked = false;
+    if (!wasEnabled) this.preloadAll();
     if (resuming) this.busy = true;
   }
 
