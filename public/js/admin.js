@@ -15,6 +15,8 @@ const els = {
   connection: document.getElementById('connection'),
   drawnCount: document.getElementById('drawn-count'),
   speakers: document.getElementById('speakers'),
+  targets: document.getElementById('targets'),
+  targetChips: document.getElementById('target-chips'),
   ball: document.getElementById('ball'),
   pad: document.getElementById('pad'),
   btnDraw: document.getElementById('btn-draw'),
@@ -41,6 +43,10 @@ let credentials = null;
 let socket = null;
 let state = { drawnNumbers: [], currentNumber: null };
 let speakerCount = 0;
+let speakerDevices = []; // [{ id, name }] com som ligado agora
+// Caixas escolhidas para tocar (vazio = todas). Guarda o nome para mostrar mesmo desconectada.
+let selectedTargets = new Map();
+const LOCAL_DEVICE_NAME = 'Celular do controle';
 let padMode = 'mark'; // 'mark' marca o número; 'check' só responde se já saiu
 const announcer = new Announcer();
 const cells = buildBoard(els.pad, { asButtons: true, onSelect: selectNumber });
@@ -57,7 +63,11 @@ function writeStore(key, value) {
 }
 
 function savePrefs() {
-  writeStore(PREFS_KEY, { repeat2: els.optRepeat.checked, local: els.optLocal.checked });
+  writeStore(PREFS_KEY, {
+    repeat2: els.optRepeat.checked,
+    local: els.optLocal.checked,
+    targets: [...selectedTargets].map(([id, name]) => ({ id, name }))
+  });
 }
 
 // ---------- API ----------
@@ -68,7 +78,11 @@ function authHeader(user, pass) {
 // body pode ser objeto (vai como JSON) ou Blob (gravação de áudio)
 async function api(action, body = {}) {
   const isBlob = body instanceof Blob;
-  const response = await fetch(`/api/rooms/${room}/${action}`, {
+  const targets = selectedTargets.size ? [...selectedTargets.keys()] : null;
+  let url = `/api/rooms/${room}/${action}`;
+  if (targets && isBlob) url += `?targets=${encodeURIComponent(targets.join(','))}`;
+  else if (targets) body = { ...body, targets };
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': isBlob ? (body.type.split(';')[0] || 'application/octet-stream') : 'application/json',
@@ -346,12 +360,58 @@ function render() {
 }
 
 function renderSpeakers() {
+  const online = new Set(speakerDevices.map(d => d.id));
+  const chosenOnline = [...selectedTargets.keys()].filter(id => online.has(id)).length;
+  if (selectedTargets.size && !chosenOnline && speakerCount > 0) {
+    els.speakers.className = 'pill pill-warn';
+    els.speakers.textContent = '⚠️ caixa escolhida desligada';
+    els.speakers.title = 'Escolha outra caixa em "Tocar em" ou toque em "Todas"';
+    renderTargets();
+    return;
+  }
+  renderTargets();
   const ok = speakerCount > 0;
   els.speakers.className = `pill ${ok ? 'pill-ok' : 'pill-warn'}`;
   els.speakers.textContent = ok
     ? `🔊 ${speakerCount} ${speakerCount === 1 ? 'caixa de som' : 'caixas de som'}`
     : '🔇 nenhuma caixa de som';
   els.speakers.title = ok ? '' : 'Abra a tela do bingo no aparelho da caixa de som e clique em "Ativar som"';
+}
+
+// Fileira "Tocar em": Todas + cada caixa ligada (e as escolhidas que caíram, apagadas)
+function renderTargets() {
+  const devices = [...speakerDevices];
+  selectedTargets.forEach((name, id) => {
+    if (!devices.some(d => d.id === id)) devices.push({ id, name, offline: true });
+  });
+  els.targets.hidden = devices.length === 0;
+  els.targetChips.innerHTML = '';
+
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.className = `target-chip${selectedTargets.size ? '' : ' active'}`;
+  all.textContent = `🔊 Todas${speakerDevices.length > 1 ? ` (${speakerDevices.length})` : ''}`;
+  all.addEventListener('click', () => {
+    selectedTargets.clear();
+    savePrefs();
+    renderSpeakers();
+  });
+  els.targetChips.appendChild(all);
+
+  devices.forEach(device => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `target-chip${selectedTargets.has(device.id) ? ' active' : ''}${device.offline ? ' offline' : ''}`;
+    chip.textContent = device.id === DEVICE_ID ? `📱 ${device.name}` : device.name;
+    if (device.offline) chip.title = 'Desconectada';
+    chip.addEventListener('click', () => {
+      if (selectedTargets.has(device.id)) selectedTargets.delete(device.id);
+      else selectedTargets.set(device.id, device.name);
+      savePrefs();
+      renderSpeakers();
+    });
+    els.targetChips.appendChild(chip);
+  });
 }
 
 // ---------- Socket ----------
@@ -361,7 +421,7 @@ function connectSocket() {
 
   socket.on('connect', () => {
     setConnection(els.connection, true);
-    socket.emit('join-room', { roomName: room, speaker: announcer.enabled });
+    socket.emit('join-room', { roomName: room, speaker: announcer.enabled, deviceId: DEVICE_ID, deviceName: LOCAL_DEVICE_NAME });
   });
   socket.on('disconnect', () => setConnection(els.connection, false));
 
@@ -375,6 +435,9 @@ function connectSocket() {
   socket.on('speakers', data => {
     if (data.room !== room) return;
     speakerCount = data.count;
+    speakerDevices = data.devices || [];
+    // Atualiza o nome guardado se a caixa foi renomeada
+    speakerDevices.forEach(d => { if (selectedTargets.has(d.id)) selectedTargets.set(d.id, d.name); });
     renderSpeakers();
   });
 
@@ -430,6 +493,7 @@ els.login.addEventListener('submit', async event => {
   if (prefs) {
     els.optRepeat.checked = prefs.repeat2 !== false;
     els.optLocal.checked = Boolean(prefs.local);
+    (prefs.targets || []).forEach(t => { if (t?.id) selectedTargets.set(t.id, t.name || 'Caixa'); });
   }
   if (room !== 'bingo') els.displayLink.href = `/?sala=${room}`;
   renderSpeakers();

@@ -89,6 +89,37 @@ function setConnection(el, connected) {
   el.title = connected ? 'Conectado' : 'Sem conexão com o servidor';
 }
 
+// ---------- Aparelho ----------
+// Cada aparelho guarda um id fixo e um nome, para o controle escolher onde tocar
+function deviceStore(key, make) {
+  try {
+    let value = localStorage.getItem(key);
+    if (!value) { value = make(); localStorage.setItem(key, value); }
+    return value;
+  } catch (e) { return make(); }
+}
+
+function guessDeviceName() {
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/TV|SmartTV|Tizen|Web0S|AFT/.test(ua)) return 'TV';
+  if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'Celular Android' : 'Tablet';
+  if (/Macintosh/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Computador';
+  return 'Caixa de som';
+}
+
+const DEVICE_ID = deviceStore('bingo-device-id', () =>
+  (crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`).replace(/[^a-zA-Z0-9-]/g, '').slice(0, 36));
+
+function getDeviceName() {
+  return deviceStore('bingo-device-name', guessDeviceName);
+}
+function setDeviceName(name) {
+  try { localStorage.setItem('bingo-device-name', name); } catch (e) { /* ignora */ }
+}
+
 // Mantém a tela acesa (só funciona em localhost/https; nos outros casos ignora)
 async function keepScreenOn() {
   try {
@@ -201,7 +232,13 @@ class Announcer {
     this.play(items);
   }
 
+  // O controle pode mandar só para algumas caixas; 'stop' vale para todas
+  isForMe(event) {
+    return event.kind === 'stop' || !Array.isArray(event.targets) || event.targets.includes(DEVICE_ID);
+  }
+
   handle(event) {
+    if (!this.isForMe(event)) return;
     if (event.kind === 'number') this.number(event.number, event.repeat);
     else if (event.kind === 'recap') this.recap(event.numbers || []);
     else if (event.kind === 'new-game') this.play(['novo-jogo']);

@@ -33,6 +33,7 @@ if (IS_PRODUCTION && (!ADMIN_PASS || ADMIN_PASS === 'admin' || ADMIN_PASS.length
   process.exit(1);
 }
 const ROOM_REGEX = /^[a-zA-Z0-9_]{1,50}$/;
+const DEVICE_REGEX = /^[a-zA-Z0-9_-]{6,40}$/;
 // Pastas de áudio em public/audio/ (a primeira é a padrão)
 const VOICES = ['francisca', 'antonio', 'thalita'];
 // Respostas rápidas (arquivos public/audio/<voz>/<id>.mp3)
@@ -109,9 +110,19 @@ function broadcastRoom(name) {
   return data;
 }
 
-// Pede para as caixas de som da sala falarem algo
-function announce(name, payload) {
-  io.to(name).emit('announce', { room: name, ...payload, timestamp: Date.now() });
+// Pede para as caixas de som da sala falarem algo.
+// targets: lista de ids de aparelho que devem tocar (null = todas as caixas)
+function announce(name, payload, targets = null) {
+  io.to(name).emit('announce', { room: name, ...payload, targets, timestamp: Date.now() });
+}
+
+// Caixas escolhidas no controle: { targets: [...] } no JSON ou ?targets=a,b (gravação)
+function parseTargets(req, res, next) {
+  let list = req.body?.targets ?? req.query.targets;
+  if (typeof list === 'string') list = list.split(',');
+  list = Array.isArray(list) ? list.filter(id => typeof id === 'string' && DEVICE_REGEX.test(id)).slice(0, 20) : [];
+  req.targets = list.length ? list : null;
+  next();
 }
 
 function parseRepeat(value) {
@@ -119,11 +130,20 @@ function parseRepeat(value) {
   return repeat >= 1 && repeat <= 3 ? repeat : 1;
 }
 
-// Quantos aparelhos com som ativado estão na sala
+// Aparelhos com som ativado na sala (um por aparelho, mesmo com várias abas)
 async function broadcastSpeakers(name) {
   const sockets = await io.in(name).fetchSockets();
-  const count = sockets.filter(s => s.data.speaker).length;
-  io.to(name).emit('speakers', { room: name, count });
+  const devices = new Map();
+  sockets.filter(s => s.data.speaker && s.data.deviceId).forEach(s => {
+    devices.set(s.data.deviceId, { id: s.data.deviceId, name: s.data.deviceName });
+  });
+  const list = [...devices.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  io.to(name).emit('speakers', { room: name, count: list.length, devices: list });
+}
+
+function cleanDeviceName(value) {
+  const text = typeof value === 'string' ? value.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 30) : '';
+  return text || 'Caixa de som';
 }
 
 // Converte a gravação do celular (mp4 no iPhone, webm no Android) para MP3,
@@ -157,11 +177,11 @@ function storeClip(buffer, type) {
   return `/api/clips/${id}`;
 }
 
-async function markNumber(name, number, repeat, res) {
+async function markNumber(name, number, repeat, res, targets) {
   try {
     await gameState.drawNumber(name, number);
     const data = broadcastRoom(name);
-    announce(name, { kind: 'number', number, repeat });
+    announce(name, { kind: 'number', number, repeat }, targets);
     res.json({ success: true, number, ...data });
   } catch (error) {
     res.status(409).json({ success: false, error: error.message, code: 'DRAW_ERROR' });
@@ -253,7 +273,7 @@ app.get('/api/qr/:name', validateRoomName, async (req, res) => {
 // ======================
 
 // Sortear número aleatório
-app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, parseTargets, async (req, res) => {
   const { name } = req.params;
   const room = gameState.get(name);
 
@@ -271,13 +291,13 @@ app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, async (req, res) 
   }
   const number = available[Math.floor(Math.random() * available.length)];
 
-  await markNumber(name, number, parseRepeat(req.body?.repeat), res);
+  await markNumber(name, number, parseRepeat(req.body?.repeat), res, req.targets);
 });
 
 // Marcar um número escolhido pelo admin (bolinha tirada do globo físico)
-app.post('/api/rooms/:name/mark', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/mark', adminAuth, validateRoomName, parseTargets, async (req, res) => {
   const number = parseInt(req.body?.number, 10);
-  await markNumber(req.params.name, number, parseRepeat(req.body?.repeat), res);
+  await markNumber(req.params.name, number, parseRepeat(req.body?.repeat), res, req.targets);
 });
 
 // Desfazer o último número (toque por engano)
@@ -290,20 +310,20 @@ app.post('/api/rooms/:name/undo', adminAuth, validateRoomName, async (req, res) 
 });
 
 // Falar de novo: um número, o último, ou todos os sorteados
-app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, (req, res) => {
+app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, parseTargets, (req, res) => {
   const { name } = req.params;
   const room = gameState.get(name);
   const { mode } = req.body || {};
 
   if (mode === 'all') {
-    announce(name, { kind: 'recap', numbers: [...room.drawnNumbers].sort((a, b) => a - b) });
+    announce(name, { kind: 'recap', numbers: [...room.drawnNumbers].sort((a, b) => a - b) }, req.targets);
   } else if (mode === 'stop') {
     announce(name, { kind: 'stop' });
   } else if (mode === 'phrase') {
     if (!PHRASES.includes(req.body.phrase)) {
       return res.status(400).json({ success: false, error: 'Frase inválida', code: 'INVALID_PHRASE' });
     }
-    announce(name, { kind: 'phrase', phrase: req.body.phrase });
+    announce(name, { kind: 'phrase', phrase: req.body.phrase }, req.targets);
   } else if (mode === 'check') {
     // "Já saiu o 32?" — fala o número e responde, sem marcar nada
     const number = parseInt(req.body.number, 10);
@@ -311,20 +331,20 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, (req, res) =>
       return res.status(400).json({ success: false, error: 'Número deve ser entre 1 e 75', code: 'INVALID_NUMBER' });
     }
     const drawn = room.drawnNumbers.includes(number);
-    announce(name, { kind: 'check', number, drawn });
+    announce(name, { kind: 'check', number, drawn }, req.targets);
     return res.json({ success: true, number, drawn });
   } else if (mode === 'last-clip') {
     const url = lastClipByRoom.get(name);
     if (!url || !clips.has(url.split('/').pop())) {
       return res.status(400).json({ success: false, error: 'Nenhuma gravação para repetir', code: 'NO_CLIP' });
     }
-    announce(name, { kind: 'clip', url });
+    announce(name, { kind: 'clip', url }, req.targets);
   } else {
     const number = mode === 'number' ? parseInt(req.body.number, 10) : room.currentNumber;
     if (!room.drawnNumbers.includes(number)) {
       return res.status(400).json({ success: false, error: 'Esse número ainda não foi sorteado', code: 'NOT_DRAWN' });
     }
-    announce(name, { kind: 'number', number, repeat: parseRepeat(req.body.repeat) });
+    announce(name, { kind: 'number', number, repeat: parseRepeat(req.body.repeat) }, req.targets);
   }
 
   res.json({ success: true });
@@ -332,7 +352,7 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, (req, res) =>
 
 // Gravação de voz do celular: converte e manda todo mundo tocar
 app.post('/api/rooms/:name/clip', adminAuth, validateRoomName,
-  express.raw({ type: ['audio/*', 'video/*', 'application/octet-stream'], limit: '10mb' }),
+  express.raw({ type: ['audio/*', 'video/*', 'application/octet-stream'], limit: '10mb' }), parseTargets,
   async (req, res) => {
     const { name } = req.params;
     if (!Buffer.isBuffer(req.body) || req.body.length < 1000) {
@@ -349,19 +369,19 @@ app.post('/api/rooms/:name/clip', adminAuth, validateRoomName,
     }
 
     lastClipByRoom.set(name, url);
-    announce(name, { kind: 'clip', url });
+    announce(name, { kind: 'clip', url }, req.targets);
     res.json({ success: true, url });
   });
 
 // Resetar sala (novo jogo)
-app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, parseTargets, async (req, res) => {
   const { name } = req.params;
 
   try {
     await gameState.reset(name);
     io.to(name).emit('room-reset', { room: name, timestamp: Date.now() });
     const data = broadcastRoom(name);
-    announce(name, { kind: 'new-game' });
+    announce(name, { kind: 'new-game' }, req.targets);
     res.json({ success: true, ...data });
   } catch (error) {
     res.status(500).json({
@@ -399,7 +419,7 @@ app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, async (req, 
 });
 
 // Definir preferência de voz
-app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, parseTargets, async (req, res) => {
   const { name } = req.params;
   const { voiceName } = req.body;
 
@@ -415,7 +435,7 @@ app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, async (req, res)
     await gameState.setVoicePreference(name, voiceName);
     broadcastRoom(name);
     // Toca uma frase de exemplo para ouvir a voz nova
-    announce(name, { kind: 'voice-test' });
+    announce(name, { kind: 'voice-test' }, req.targets);
     res.json({ success: true, room: name, voicePreference: voiceName });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -435,7 +455,7 @@ io.on('connection', (socket) => {
   });
 
   // Entrar em uma sala
-  socket.on('join-room', ({ roomName, speaker } = {}) => {
+  socket.on('join-room', ({ roomName, speaker, deviceId, deviceName } = {}) => {
     if (!roomName || !ROOM_REGEX.test(roomName)) {
       socket.emit('error', {
         code: 'INVALID_ROOM_NAME',
@@ -447,6 +467,8 @@ io.on('connection', (socket) => {
     socket.join(roomName);
     socket.data.room = roomName;
     socket.data.speaker = Boolean(speaker);
+    socket.data.deviceId = DEVICE_REGEX.test(deviceId || '') ? deviceId : socket.id;
+    socket.data.deviceName = cleanDeviceName(deviceName);
     socket.emit('room-state', serializeRoom(roomName));
     broadcastSpeakers(roomName);
 
@@ -454,8 +476,9 @@ io.on('connection', (socket) => {
   });
 
   // Aparelho ligou/desligou o som
-  socket.on('speaker', ({ on } = {}) => {
+  socket.on('speaker', ({ on, deviceName } = {}) => {
     socket.data.speaker = Boolean(on);
+    if (deviceName !== undefined) socket.data.deviceName = cleanDeviceName(deviceName);
     if (socket.data.room) broadcastSpeakers(socket.data.room);
   });
 

@@ -11,10 +11,12 @@ const els = {
   drawnCount: document.getElementById('drawn-count'),
   connection: document.getElementById('connection'),
   btnSound: document.getElementById('btn-sound'),
+  btnName: document.getElementById('btn-name'),
   btnFullscreen: document.getElementById('btn-fullscreen'),
   overlay: document.getElementById('sound-overlay'),
   btnEnableSound: document.getElementById('btn-enable-sound'),
   btnNoSound: document.getElementById('btn-no-sound'),
+  deviceName: document.getElementById('device-name'),
   connect: document.getElementById('connect'),
   adminQr: document.getElementById('admin-qr'),
   adminUrl: document.getElementById('admin-url')
@@ -46,15 +48,33 @@ function render() {
   });
 }
 
+function renderName() {
+  els.btnName.textContent = `📍 ${getDeviceName()}`;
+}
+
+// Nome que aparece no controle, para escolher em qual caixa tocar
+function renameDevice() {
+  const name = prompt('Nome desta caixa de som (aparece no controle):', getDeviceName());
+  if (!name || !name.trim()) return;
+  setDeviceName(name.trim().slice(0, 30));
+  renderName();
+  socket.emit('speaker', { on: announcer.enabled, deviceName: getDeviceName() });
+}
+
 function renderSoundButton() {
   els.btnSound.textContent = announcer.enabled ? '🔊 Som ligado' : '🔇 Som desligado';
   els.btnSound.classList.toggle('btn-warning', !announcer.enabled);
 }
 
 async function enableSound() {
+  const typed = els.deviceName.value.trim();
+  if (typed && typed !== getDeviceName()) {
+    setDeviceName(typed.slice(0, 30));
+    renderName();
+  }
   try {
     await announcer.enable();
-    socket.emit('speaker', { on: true });
+    socket.emit('speaker', { on: true, deviceName: getDeviceName() });
     els.overlay.hidden = true;
     keepScreenOn();
   } catch (e) {
@@ -72,7 +92,7 @@ function disableSound() {
 // ---------- Socket ----------
 socket.on('connect', () => {
   setConnection(els.connection, true);
-  socket.emit('join-room', { roomName: room, speaker: announcer.enabled });
+  socket.emit('join-room', { roomName: room, speaker: announcer.enabled, deviceId: DEVICE_ID, deviceName: getDeviceName() });
 });
 socket.on('disconnect', () => setConnection(els.connection, false));
 
@@ -85,7 +105,7 @@ socket.on('room-state', data => {
 
 socket.on('announce', event => {
   if (event.room !== room) return;
-  if (event.kind === 'number') {
+  if (event.kind === 'number' && announcer.isForMe(event)) {
     els.ball.classList.remove('pop');
     void els.ball.offsetWidth; // reinicia a animação
     els.ball.classList.add('pop');
@@ -97,6 +117,7 @@ socket.on('announce', event => {
 els.btnEnableSound.addEventListener('click', enableSound);
 els.btnNoSound.addEventListener('click', () => { els.overlay.hidden = true; });
 els.btnSound.addEventListener('click', () => (announcer.enabled ? disableSound() : enableSound()));
+els.btnName.addEventListener('click', renameDevice);
 els.btnFullscreen.addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.();
@@ -113,3 +134,5 @@ fetch(`/api/info?sala=${room}`)
   .catch(() => {});
 
 renderSoundButton();
+renderName();
+els.deviceName.value = getDeviceName();

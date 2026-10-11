@@ -13,6 +13,7 @@
     <div class="topbar-info">
       <span><strong id="drawn-count">0</strong> de 75 sorteados</span>
       <span id="connection" class="conn disconnected" title="Sem conexão"></span>
+      <button id="btn-name" class="btn btn-ghost" type="button" title="Mudar o nome desta caixa de som">📍</button>
       <button id="btn-sound" class="btn btn-ghost" type="button">🔇 Som desligado</button>
       <button id="btn-fullscreen" class="btn btn-ghost" type="button">⛶ Tela cheia</button>
     </div>
@@ -42,6 +43,9 @@
       <p class="overlay-emoji">🔊</p>
       <h2>Esta tela vai falar os números</h2>
       <p>Ligue a caixa de som neste aparelho e clique no botão abaixo.</p>
+      <label class="overlay-name">Nome desta caixa
+        <input id="device-name" type="text" maxlength="30" placeholder="Ex.: Sala, Varanda">
+      </label>
       <button id="btn-enable-sound" class="btn btn-primary btn-big" type="button">Ativar som</button>
       <button id="btn-no-sound" class="btn btn-ghost" type="button">Só mostrar, sem som</button>
     </div>
