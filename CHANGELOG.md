@@ -18,6 +18,11 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.1.0 — 2026-10-17
+- Respostas rápidas com 4 variações cada; o servidor sorteia sem repetir a anterior, e todas as caixas falam a mesma. O modo conferir também varia o "já saiu / não saiu".
+- Voz mais rápida: os áudios das três vozes foram gerados de novo na velocidade natural (antes `-12%`).
+- Áudios com versão na URL, para o navegador e o Cloudflare não continuarem tocando os arquivos antigos.
+
 ### 4.0.0 — 2026-10-17
 - Repositórios antigos reunidos aqui como tags; autor de todos os commits unificado.
 - Faxina: `node_modules` e `.DS_Store` fora do git, documentação da época da recuperação removida, README reescrito.

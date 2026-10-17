@@ -10,14 +10,26 @@ const COLUMNS = [
   { letter: 'O', min: 61, max: 75 }
 ];
 
+// Cada frase tem variações (<id>.mp3, <id>-2.mp3, ...); o servidor escolhe qual tocar
 const PHRASES = [
-  { id: 'sim-saiu', label: '✅ Sim, já saiu!' },
-  { id: 'nao-saiu', label: '❌ Ainda não saiu' },
-  { id: 'conferir', label: '🔎 Vamos conferir' },
-  { id: 'vencedor', label: '🏆 Temos vencedor!' },
-  { id: 'aguarde', label: '✋ Um momento' }
+  { id: 'sim-saiu', label: '✅ Sim, já saiu!', variants: 4 },
+  { id: 'nao-saiu', label: '❌ Ainda não saiu', variants: 4 },
+  { id: 'conferir', label: '🔎 Vamos conferir', variants: 4 },
+  { id: 'vencedor', label: '🏆 Temos vencedor!', variants: 4 },
+  { id: 'aguarde', label: '✋ Um momento', variants: 4 }
 ];
-const EXTRA_CLIPS = ['recap-inicio', 'recap-fim', 'nenhum', 'novo-jogo', 'teste', ...PHRASES.map(p => p.id)];
+
+function phraseClip(id, variant) {
+  return variant > 1 ? `${id}-${variant}` : id;
+}
+
+const EXTRA_CLIPS = [
+  'recap-inicio', 'recap-fim', 'nenhum', 'novo-jogo', 'teste',
+  ...PHRASES.flatMap(p => Array.from({ length: p.variants }, (_, i) => phraseClip(p.id, i + 1)))
+];
+
+// Versão dos áudios que o servidor põe na página: muda quando eles são gerados de novo
+const AUDIO_VERSION = document.querySelector('meta[name="bingo-audio"]')?.content || '';
 
 // Vozes disponíveis (pastas em public/audio/, geradas por scripts/gerar-audios.sh)
 const VOICES = [
@@ -177,7 +189,7 @@ class Announcer {
     const resuming = this.blocked && this.queue.length > 0;
     if (resuming) this.queue.shift();
     this.enabled = true;
-    if (!resuming) this.audio.src = '/audio/sinal.mp3';
+    if (!resuming) this.audio.src = this.clipUrl('sinal');
     try {
       await this.audio.play();
     } catch (error) {
@@ -206,8 +218,9 @@ class Announcer {
 
   clipUrl(clip) {
     if (clip.startsWith('/')) return clip; // gravação do celular
-    if (clip === 'sinal' || clip === 'silencio') return `/audio/${clip}.mp3`;
-    return `/audio/${this.voice}/${clip}.mp3`;
+    const version = AUDIO_VERSION ? `?v=${AUDIO_VERSION}` : '';
+    if (clip === 'sinal' || clip === 'silencio') return `/audio/${clip}.mp3${version}`;
+    return `/audio/${this.voice}/${clip}.mp3${version}`;
   }
 
   preloadAll() {
@@ -306,9 +319,10 @@ class Announcer {
     else if (event.kind === 'recap') this.recap(event.numbers || []);
     else if (event.kind === 'new-game') this.play(['novo-jogo']);
     else if (event.kind === 'voice-test') this.play(['teste']);
-    else if (event.kind === 'phrase') this.play([event.phrase]);
+    else if (event.kind === 'phrase') this.play([phraseClip(event.phrase, event.variant)]);
     else if (event.kind === 'check') {
-      this.play(['sinal', { wait: 150 }, String(event.number), { wait: 300 }, event.drawn ? 'sim-saiu' : 'nao-saiu']);
+      const answer = phraseClip(event.drawn ? 'sim-saiu' : 'nao-saiu', event.variant);
+      this.play(['sinal', { wait: 150 }, String(event.number), { wait: 300 }, answer]);
     } else if (event.kind === 'clip') this.play(['sinal', { wait: 150 }, event.url]);
     else if (event.kind === 'stop') this.stop();
   }

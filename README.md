@@ -51,7 +51,7 @@ Quem canta usa o celular. O servidor guarda o jogo e avisa todas as telas na hor
 - 🔁 **Repetir último** · ↩️ **Desfazer último** (toque errado acontece)
 - 📣 **Falar todos os números** em ordem, destacando cada um no telão enquanto fala
 - 🎙️ **Segure para falar**: grava sua voz e toca na caixa de som, com volume ajustado para ficar parecido com a voz da IA
-- 💬 **Respostas rápidas**: "Sim, já saiu!", "Ainda não saiu", "Vamos conferir", "Temos vencedor!", "Um momento"
+- 💬 **Respostas rápidas**: "Sim, já saiu!", "Ainda não saiu", "Vamos conferir", "Temos vencedor!", "Um momento", cada uma com 4 jeitos de falar, sorteados sem repetir a anterior
 - 🔎 **Modo conferir**: quando alguém grita bingo, toque nos números da cartela dele para ver se já saíram, sem marcar nada
 - 🔊 **Escolher a caixa de som**: tocar em todas, só em uma, ou no próprio celular
 - ⚙️ Três vozes (Francisca, Antonio, Thalita), novo jogo e opções
@@ -116,7 +116,7 @@ public/audio/<voz>/    MP3 de cada número e das respostas rápidas
 scripts/gerar-audios.sh  Gera os áudios de uma voz
 ```
 
-**Outra voz:** `scripts/gerar-audios.sh pt-BR-AntonioNeural` gera os áudios com [edge-tts](https://github.com/rany2/edge-tts) (precisa de internet e [uv](https://docs.astral.sh/uv/)). Depois cadastre a voz em `VOICES` (`server.js`) e em `public/js/common.js`.
+**Outra voz:** `scripts/gerar-audios.sh pt-BR-AntonioNeural` gera os áudios com [edge-tts](https://github.com/rany2/edge-tts) (precisa de internet e [uv](https://docs.astral.sh/uv/)). Depois cadastre a voz em `VOICES` (`server.js`) e em `public/js/common.js`. O segundo argumento muda a velocidade (padrão `+0%`; ex.: `-10%` para falar mais devagar). Para mudar ou acrescentar variações das respostas rápidas, edite as linhas `frases` do script e a quantidade em `PHRASES` (`server.js` e `public/js/common.js`).
 
 ## A história deste repositório
 

@@ -36,8 +36,9 @@ const ROOM_REGEX = /^[a-zA-Z0-9_]{1,50}$/;
 const DEVICE_REGEX = /^[a-zA-Z0-9_-]{6,40}$/;
 // Pastas de áudio em public/audio/ (a primeira é a padrão)
 const VOICES = ['francisca', 'antonio', 'thalita'];
-// Respostas rápidas (arquivos public/audio/<voz>/<id>.mp3)
-const PHRASES = ['sim-saiu', 'nao-saiu', 'conferir', 'vencedor', 'aguarde'];
+// Respostas rápidas: id -> quantas variações (public/audio/<voz>/<id>.mp3, <id>-2.mp3, ...)
+const PHRASES = { 'sim-saiu': 4, 'nao-saiu': 4, conferir: 4, vencedor: 4, aguarde: 4 };
+const lastVariant = new Map(); // "sala:frase" -> última variação tocada
 // Gravações feitas no celular: ficam só na memória, as mais recentes
 const MAX_CLIPS = 30;
 const clips = new Map(); // id -> { buffer, type }
@@ -62,10 +63,25 @@ function assetVersion() {
 }
 const ASSET_VERSION = assetVersion();
 
+// Os áudios ficam 7 dias em cache; quando são gerados de novo, a versão na URL muda
+function audioVersion() {
+  const hash = crypto.createHash('sha1');
+  const walk = folder => fs.readdirSync(folder, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(entry => {
+      const file = path.join(folder, entry.name);
+      if (entry.isDirectory()) walk(file);
+      else if (entry.name.endsWith('.mp3')) hash.update(entry.name).update(fs.readFileSync(file));
+    });
+  walk(path.join(__dirname, 'public', 'audio'));
+  return hash.digest('hex').slice(0, 10);
+}
+const AUDIO_VERSION = audioVersion();
+
 function renderPage(file) {
   return fs.readFileSync(path.join(__dirname, 'public', file), 'utf8')
     .replace(/(src|href)="\/(js|css)\/([^"?]+)"/g, `$1="/$2/$3?v=${ASSET_VERSION}"`)
-    .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">`);
+    .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">\n  <meta name="bingo-audio" content="${AUDIO_VERSION}">`);
 }
 const PAGES = IS_PRODUCTION
   ? { display: renderPage('index.html'), admin: renderPage('admin.html') }
@@ -153,6 +169,23 @@ function announce(name, payload, targets = null) {
   return event;
 }
 const REPLAY_WINDOW_MS = 10000;
+
+// Sorteia a variação da frase aqui (e não em cada caixa) para todas falarem a mesma,
+// sem repetir a última que tocou nessa sala
+function pickVariant(name, phrase) {
+  const count = PHRASES[phrase];
+  const key = `${name}:${phrase}`;
+  const last = lastVariant.get(key);
+  let variant;
+  if (count > 1 && last) {
+    variant = 1 + Math.floor(Math.random() * (count - 1));
+    if (variant >= last) variant++;
+  } else {
+    variant = 1 + Math.floor(Math.random() * count);
+  }
+  lastVariant.set(key, variant);
+  return variant;
+}
 
 // Caixas escolhidas no controle: { targets: [...] } no JSON ou ?targets=a,b (gravação)
 function parseTargets(req, res, next) {
@@ -363,10 +396,11 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, parseTargets,
   } else if (mode === 'stop') {
     announce(name, { kind: 'stop' });
   } else if (mode === 'phrase') {
-    if (!PHRASES.includes(req.body.phrase)) {
+    const { phrase } = req.body;
+    if (!Object.hasOwn(PHRASES, phrase)) {
       return res.status(400).json({ success: false, error: 'Frase inválida', code: 'INVALID_PHRASE' });
     }
-    announce(name, { kind: 'phrase', phrase: req.body.phrase }, req.targets);
+    announce(name, { kind: 'phrase', phrase, variant: pickVariant(name, phrase) }, req.targets);
   } else if (mode === 'check') {
     // "Já saiu o 32?" — fala o número e responde, sem marcar nada
     const number = parseInt(req.body.number, 10);
@@ -374,7 +408,8 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, parseTargets,
       return res.status(400).json({ success: false, error: 'Número deve ser entre 1 e 75', code: 'INVALID_NUMBER' });
     }
     const drawn = room.drawnNumbers.includes(number);
-    announce(name, { kind: 'check', number, drawn }, req.targets);
+    const variant = pickVariant(name, drawn ? 'sim-saiu' : 'nao-saiu');
+    announce(name, { kind: 'check', number, drawn, variant }, req.targets);
     return res.json({ success: true, number, drawn });
   } else if (mode === 'last-clip') {
     const url = lastClipByRoom.get(name);

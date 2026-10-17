@@ -8,7 +8,7 @@
 set -euo pipefail
 
 VOICE="${1:-pt-BR-FranciscaNeural}"
-RATE="${2:--12%}"
+RATE="${2:-+0%}"
 SLUG="$(echo "$VOICE" | sed -E 's/^pt-BR-//; s/(Multilingual)?Neural$//' | tr '[:upper:]' '[:lower:]')"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)/public/audio"
 OUT="$ROOT/$SLUG"
@@ -23,8 +23,14 @@ letra_falada() {
   else echo "ó"; fi
 }
 
-falar() { # texto arquivo
-  uvx edge-tts --voice "$VOICE" --rate="$RATE" --text "$1" --write-media "$2" >/dev/null 2>&1
+falar() { # texto arquivo — o serviço às vezes devolve vazio quando há muitos pedidos juntos
+  for tentativa in 1 2 3; do
+    uvx edge-tts --voice "$VOICE" --rate="$RATE" --text "$1" --write-media "$2" >/dev/null 2>&1 || true
+    [ -s "$2" ] && return 0
+    sleep "$tentativa"
+  done
+  echo "falhou: $2" >&2
+  return 1
 }
 export -f falar letra_falada
 export VOICE RATE OUT
@@ -38,12 +44,25 @@ falar "Ainda não saiu nenhum número." "$OUT/nenhum.mp3"
 falar "Vamos começar um novo jogo. Boa sorte a todos!" "$OUT/novo-jogo.mp3"
 falar "Olá! Esta é a voz que vai cantar os números do bingo." "$OUT/teste.mp3"
 
-# Respostas rápidas do controle (ids iguais aos de PHRASES em server.js)
-falar "Sim, já saiu!" "$OUT/sim-saiu.mp3"
-falar "Não, ainda não saiu." "$OUT/nao-saiu.mp3"
-falar "Atenção! Vamos conferir a cartela." "$OUT/conferir.mp3"
-falar "Temos um vencedor! Parabéns!" "$OUT/vencedor.mp3"
-falar "Um momento, por favor." "$OUT/aguarde.mp3"
+# Respostas rápidas do controle, com variações para não repetir sempre a mesma frase.
+# Arquivos <id>.mp3, <id>-2.mp3, <id>-3.mp3...; ids e quantidades iguais aos de PHRASES
+# em server.js e public/js/common.js.
+frases() { # id texto1 texto2 ...
+  local id="$1" n=1
+  shift
+  for texto in "$@"; do
+    local arquivo="$OUT/$id.mp3"
+    [ "$n" -gt 1 ] && arquivo="$OUT/$id-$n.mp3"
+    falar "$texto" "$arquivo" &
+    n=$((n + 1))
+  done
+  wait
+}
+frases sim-saiu "Sim, já saiu!" "Esse já saiu, sim!" "Saiu, sim! Esse está valendo." "Já foi sorteado, sim!"
+frases nao-saiu "Não, ainda não saiu." "Esse ainda não saiu." "Ainda não, pessoal. Calma!" "Não saiu ainda, segura aí!"
+frases conferir "Atenção! Vamos conferir a cartela." "Opa! Alguém gritou bingo? Vamos conferir!" "Peraí, pessoal! Hora de conferir a cartela." "Atenção, todo mundo! Vamos ver se essa cartela está certa."
+frases vencedor "Temos um vencedor! Parabéns!" "Bingo! Temos um ganhador! Parabéns!" "É bingo! Uma salva de palmas para o vencedor!" "Cartela conferida: temos vencedor! Parabéns!"
+frases aguarde "Um momento, por favor." "Só um instante, pessoal." "Aguardem um pouquinho." "Já já a gente continua!"
 
 # Sinal curto antes de cada número (igual para todas as vozes)
 if [ ! -f "$ROOT/sinal.mp3" ]; then
