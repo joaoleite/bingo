@@ -15,6 +15,14 @@
   <!-- Login -->
   <form id="login" class="login-card" autocomplete="on">
     <h1>🎱 Controle do Bingo</h1>
+    <div id="login-owned" class="login-note" hidden>
+      <strong>Este bingo tem dono.</strong>
+      Para sortear, abra o <b>link do controle</b> que apareceu quando o bingo foi criado (ou peça para quem criou).
+    </div>
+    <div id="login-expired" class="login-note" hidden>
+      <strong>Este bingo não existe mais.</strong>
+      Bingos parados por 48 horas são apagados. <a href="/novo">Crie outro aqui</a>, é rapidinho.
+    </div>
     <label>Usuário
       <input type="text" id="login-user" autocomplete="username" autocapitalize="none" required>
     </label>
@@ -84,6 +92,12 @@
         <span>Tocar o som também neste celular<br><small>Use se a caixa de som estiver ligada no celular (bluetooth)</small></span>
       </label>
       <a id="display-link" class="btn" href="/" target="_blank">🖥️ Abrir a tela do bingo</a>
+      <div id="share" class="share" hidden>
+        <p class="share-title">🔗 Links deste bingo (<span id="share-room"></span>)</p>
+        <button id="btn-share-display" class="btn" type="button">📺 Enviar link do telão</button>
+        <button id="btn-share-admin" class="btn" type="button">🎮 Enviar link do controle</button>
+        <small>Quem tiver o link do controle consegue sortear neste bingo. O bingo é apagado depois de 48 horas parado.</small>
+      </div>
       <button id="btn-reset" class="btn btn-danger" type="button">🔄 Novo jogo (apagar números)</button>
       <button id="btn-logout" class="btn btn-ghost" type="button">Sair</button>
       <p id="version" class="version"></p>

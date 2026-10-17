@@ -4,6 +4,8 @@
 
 const room = getRoomFromUrl();
 const CREDENTIALS_KEY = 'bingo-admin';
+// Chave do controle de um bingo criado em /novo (uma por sala, guardada neste aparelho)
+const ROOM_KEY_STORE = `bingo-key:${room}`;
 const PREFS_KEY = 'bingo-admin-prefs';
 
 const els = {
@@ -11,6 +13,12 @@ const els = {
   loginUser: document.getElementById('login-user'),
   loginPass: document.getElementById('login-pass'),
   loginError: document.getElementById('login-error'),
+  loginOwned: document.getElementById('login-owned'),
+  loginExpired: document.getElementById('login-expired'),
+  share: document.getElementById('share'),
+  shareRoom: document.getElementById('share-room'),
+  btnShareDisplay: document.getElementById('btn-share-display'),
+  btnShareAdmin: document.getElementById('btn-share-admin'),
   controller: document.getElementById('controller'),
   connection: document.getElementById('connection'),
   drawnCount: document.getElementById('drawn-count'),
@@ -39,7 +47,7 @@ const els = {
   toast: document.getElementById('toast')
 };
 
-let credentials = null;
+let credentials = null; // { key } (bingo criado em /novo) ou { user, pass } (dono do servidor)
 let socket = null;
 let state = { drawnNumbers: [], currentNumber: null };
 let speakerCount = 0;
@@ -93,6 +101,10 @@ function authHeader(user, pass) {
   return 'Basic ' + btoa(unescape(encodeURIComponent(`${user}:${pass}`)));
 }
 
+function authHeaders(creds) {
+  return creds.key ? { 'X-Bingo-Key': creds.key } : { Authorization: authHeader(creds.user, creds.pass) };
+}
+
 // body pode ser objeto (vai como JSON) ou Blob (gravação de áudio)
 async function api(action, body = {}) {
   const isBlob = body instanceof Blob;
@@ -104,15 +116,18 @@ async function api(action, body = {}) {
     method: 'POST',
     headers: {
       'Content-Type': isBlob ? (body.type.split(';')[0] || 'application/octet-stream') : 'application/json',
-      Authorization: authHeader(credentials.user, credentials.pass)
+      ...authHeaders(credentials)
     },
     body: isBlob ? body : JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
 
   if (response.status === 401) {
+    const usedKey = Boolean(credentials?.key);
     logout();
-    throw new Error('Sessão expirada, entre de novo');
+    // A chave parou de valer: o bingo foi apagado por ficar parado
+    if (usedKey) showLoginNotes({ exists: false });
+    throw new Error(usedKey ? 'Este bingo não existe mais' : 'Sessão expirada, entre de novo');
   }
   if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao falar com o servidor');
   playHere(data.announce, 'resposta');
@@ -490,24 +505,58 @@ function connectSocket() {
 }
 
 // ---------- Login ----------
-async function checkCredentials(user, pass) {
-  const response = await fetch('/api/admin/check', { headers: { Authorization: authHeader(user, pass) } });
+async function checkAccess(creds) {
+  const response = await fetch(`/api/rooms/${room}/check`, { headers: authHeaders(creds) });
   return response.ok;
 }
 
 function showController() {
   els.login.hidden = true;
   els.controller.hidden = false;
+  // Bingo com chave: links para compartilhar; "Sair" não faz sentido (a chave é o acesso)
+  els.share.hidden = !credentials.key;
+  els.btnLogout.hidden = Boolean(credentials.key);
+  els.shareRoom.textContent = room;
   connectSocket();
   keepScreenOn();
 }
 
 function logout() {
+  if (credentials?.key) writeStore(ROOM_KEY_STORE, null);
+  else writeStore(CREDENTIALS_KEY, null);
   credentials = null;
-  writeStore(CREDENTIALS_KEY, null);
   els.controller.hidden = true;
   els.login.hidden = false;
 }
+
+// Explica por que pede senha: bingo de outra pessoa ou bingo que já foi apagado
+function showLoginNotes(info) {
+  els.loginOwned.hidden = !info?.owned;
+  els.loginExpired.hidden = !(info && !info.exists && room !== 'bingo');
+}
+
+// Celular abre o menu de compartilhar (WhatsApp etc.); no computador, copia
+async function shareLink(url, title) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('🔗 Link copiado');
+  } catch (e) {
+    toast(url);
+  }
+}
+
+els.btnShareDisplay.addEventListener('click', () => shareLink(`${location.origin}/?sala=${room}`, 'Telão do bingo'));
+els.btnShareAdmin.addEventListener('click', () => {
+  if (credentials?.key) shareLink(`${location.origin}/admin?sala=${room}#chave=${credentials.key}`, 'Controle do bingo');
+});
 
 els.login.addEventListener('submit', async event => {
   event.preventDefault();
@@ -516,7 +565,7 @@ els.login.addEventListener('submit', async event => {
   els.loginError.hidden = true;
 
   try {
-    if (!(await checkCredentials(user, pass))) {
+    if (!(await checkAccess({ user, pass }))) {
       els.loginError.textContent = 'Usuário ou senha incorretos';
       els.loginError.hidden = false;
       return;
@@ -543,10 +592,28 @@ els.login.addEventListener('submit', async event => {
   document.getElementById('version').textContent = `versão ${version || 'desconhecida'}`;
   renderSpeakers();
 
+  // Link do controle traz a chave depois do #: guarda neste aparelho e tira da barra de endereço
+  const fromLink = new URLSearchParams(location.hash.slice(1)).get('chave');
+  if (fromLink) {
+    writeStore(ROOM_KEY_STORE, fromLink);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  const key = readStore(ROOM_KEY_STORE);
+  if (typeof key === 'string' && key) {
+    try {
+      if (await checkAccess({ key })) {
+        credentials = { key };
+        showController();
+        return;
+      }
+      writeStore(ROOM_KEY_STORE, null);
+    } catch (e) { /* sem conexão: cai no login */ }
+  }
+
   const saved = readStore(CREDENTIALS_KEY);
   if (saved?.user && saved?.pass) {
     try {
-      if (await checkCredentials(saved.user, saved.pass)) {
+      if (await checkAccess(saved)) {
         credentials = saved;
         showController();
         return;
@@ -556,4 +623,5 @@ els.login.addEventListener('submit', async event => {
   }
   els.loginUser.value = saved?.user || 'admin';
   els.loginPass.focus();
+  fetch(`/api/rooms/${room}`).then(r => r.json()).then(showLoginNotes).catch(() => {});
 })();

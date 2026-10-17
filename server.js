@@ -28,13 +28,17 @@ if (IS_PRODUCTION && (!ADMIN_PASS || ADMIN_PASS === 'admin' || ADMIN_PASS.length
   console.error('ERRO: defina ADMIN_PASS com pelo menos 8 caracteres (e diferente de "admin") em produção.');
   process.exit(1);
 }
-const ROOM_REGEX = /^[a-zA-Z0-9_]{1,50}$/;
+const ROOM_REGEX = /^[a-zA-Z0-9_-]{1,50}$/;
 const DEVICE_REGEX = /^[a-zA-Z0-9_-]{6,40}$/;
 // Pastas de áudio em public/audio/ (a primeira é a padrão)
 const VOICES = ['francisca', 'antonio', 'thalita'];
 // Respostas rápidas: id -> quantas variações (public/audio/<voz>/<id>.mp3, <id>-2.mp3, ...)
 const PHRASES = { 'sim-saiu': 4, 'nao-saiu': 4, conferir: 4, vencedor: 4, aguarde: 4 };
 const lastVariant = new Map(); // "sala:frase" -> última variação tocada
+// Bingos criados em /novo: somem depois de ROOM_TTL_HOURS parados; limites contra abuso
+const ROOM_TTL_MS = (Number(process.env.ROOM_TTL_HOURS) || 48) * 60 * 60 * 1000;
+const ROOM_CREATE_LIMIT = Number(process.env.ROOM_CREATE_LIMIT) || 10; // por endereço, por hora
+const MAX_OWNED_ROOMS = Number(process.env.MAX_OWNED_ROOMS) || 500;
 // Gravações feitas no celular: ficam só na memória, as mais recentes
 const MAX_CLIPS = 30;
 const clips = new Map(); // id -> { buffer, type }
@@ -80,7 +84,7 @@ function renderPage(file) {
     .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">\n  <meta name="bingo-audio" content="${AUDIO_VERSION}">`);
 }
 const PAGES = IS_PRODUCTION
-  ? { display: renderPage('index.html'), admin: renderPage('admin.html') }
+  ? { display: renderPage('index.html'), admin: renderPage('admin.html'), novo: renderPage('novo.html') }
   : null;
 
 function sendPage(name, file) {
@@ -91,6 +95,7 @@ function sendPage(name, file) {
 }
 app.get(['/', '/index.html'], sendPage('display', 'index.html'));
 app.get(['/admin', '/admin.html'], sendPage('admin', 'admin.html'));
+app.get(['/novo', '/novo.html'], sendPage('novo', 'novo.html'));
 
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -105,7 +110,7 @@ const adminAuth = basicAuth({
 // Middleware de validação de sala
 const validateRoomName = (req, res, next) => {
   const { name } = req.params;
-  // Sanitiza nome da sala: apenas letras, números e underscore, máximo 50 chars
+  // Sanitiza nome da sala: letras, números, _ e -, máximo 50 chars
   if (!name || !ROOM_REGEX.test(name)) {
     return res.status(400).json({
       success: false,
@@ -115,6 +120,26 @@ const validateRoomName = (req, res, next) => {
   }
   next();
 };
+
+// Chave do controle de um bingo criado em /novo: guardamos só o hash
+function hashKey(key) {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+function keyMatches(key, keyHash) {
+  if (typeof key !== 'string' || key.length < 16 || key.length > 64) return false;
+  const given = Buffer.from(hashKey(key), 'hex');
+  const expected = Buffer.from(keyHash, 'hex');
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
+// Quem pode mandar na sala: a chave dela (header X-Bingo-Key) ou o dono do servidor (usuário e senha).
+// Sala sem chave (a da família) aceita só usuário e senha.
+function roomAuth(req, res, next) {
+  const room = gameState.peek(req.params.name);
+  if (room?.keyHash && keyMatches(req.get('x-bingo-key'), room.keyHash)) return next();
+  return adminAuth(req, res, next);
+}
 
 // Endereços IPv4 da rede local, para o celular conseguir acessar
 function getLanAddresses() {
@@ -128,10 +153,14 @@ function getLanAddresses() {
   return addresses.sort((a, b) => Number(!a.startsWith('192.168.')) - Number(!b.startsWith('192.168.')));
 }
 
+// Não cria a sala: telão aberto numa sala que não existe só mostra "aguardando"
 function serializeRoom(name) {
-  const room = gameState.get(name);
+  const stored = gameState.peek(name);
+  const room = stored || gameState._newRoom();
   return {
     name,
+    exists: Boolean(stored),
+    owned: Boolean(stored?.keyHash),
     currentNumber: room.currentNumber,
     drawnNumbers: room.drawnNumbers,
     isShowingAll: room.isShowingAll,
@@ -149,7 +178,6 @@ function serializeRoom(name) {
 function broadcastRoom(name) {
   const data = serializeRoom(name);
   io.to(name).emit('room-state', data);
-  io.emit('room-updated', data);
   return data;
 }
 
@@ -283,14 +311,19 @@ app.get('/api/admin/check', adminAuth, (req, res) => {
   res.json({ success: true, user: req.auth.user });
 });
 
+// Endereço que o celular consegue abrir.
+// Acessando por localhost, o celular precisa do IP da rede; senão, o mesmo endereço do navegador
+function publicBase(req) {
+  const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.get('host') || '');
+  const lan = getLanAddresses()[0];
+  return PUBLIC_URL
+    || (isLocal && lan ? `http://${lan}:${PORT}` : `${req.protocol}://${req.get('host')}`);
+}
+
 // Endereços para abrir a tela e o controle de outro aparelho
 app.get('/api/info', async (req, res) => {
   const room = ROOM_REGEX.test(req.query.sala || '') ? req.query.sala : 'bingo';
-  // Acessando por localhost, o celular precisa do IP da rede; senão, o mesmo endereço do navegador
-  const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.get('host') || '');
-  const lan = getLanAddresses()[0];
-  const base = PUBLIC_URL
-    || (isLocal && lan ? `http://${lan}:${PORT}` : `${req.protocol}://${req.get('host')}`);
+  const base = publicBase(req);
   const suffix = room === 'bingo' ? '' : `?sala=${room}`;
   const adminUrl = `${base}/admin${suffix}`;
 
@@ -311,8 +344,8 @@ app.get('/api/clips/:id', (req, res) => {
   res.send(clip.buffer);
 });
 
-// Listar todas as salas
-app.get('/api/rooms', (req, res) => {
+// Listar todas as salas (só o dono do servidor: os nomes dão acesso aos telões)
+app.get('/api/rooms', adminAuth, (req, res) => {
   const rooms = Object.keys(gameState.rooms).map(serializeRoom);
   res.json({ rooms, totalRooms: rooms.length });
 });
@@ -340,12 +373,97 @@ app.get('/api/qr/:name', validateRoomName, async (req, res) => {
   }
 });
 
+// ---------- Bingo público: qualquer pessoa cria o seu ----------
+// Palavras sem acento e cores que não mudam com o gênero ("pipoca-azul-4821")
+const ROOM_WORDS = ['festa', 'sorte', 'estrela', 'rodada', 'pipoca', 'balao', 'fogueira', 'cometa',
+  'foguete', 'trevo', 'coruja', 'tucano', 'girafa', 'panda', 'abacaxi', 'caju', 'coco', 'jabuti',
+  'sabia', 'arara', 'pinguim', 'cacau', 'bolinha', 'sorriso'];
+const ROOM_COLORS = ['azul', 'verde', 'rosa', 'lilas', 'cinza', 'laranja', 'vinho', 'coral',
+  'turquesa', 'jade', 'marfim', 'cobalto'];
+const createdByIp = new Map(); // ip -> horários de criação na última hora
+
+function newRoomName() {
+  for (let i = 0; i < 20; i++) {
+    const name = [
+      ROOM_WORDS[crypto.randomInt(ROOM_WORDS.length)],
+      ROOM_COLORS[crypto.randomInt(ROOM_COLORS.length)],
+      crypto.randomInt(1000, 10000)
+    ].join('-');
+    if (!gameState.peek(name)) return name;
+  }
+  throw new Error('Não achei um nome livre');
+}
+
+// Atrás do Cloudflare o endereço real vem no CF-Connecting-IP
+function clientIp(req) {
+  return req.get('cf-connecting-ip') || req.ip;
+}
+
+function canCreate(ip, now = Date.now()) {
+  const recent = (createdByIp.get(ip) || []).filter(t => now - t < 60 * 60 * 1000);
+  createdByIp.set(ip, recent);
+  return recent.length < ROOM_CREATE_LIMIT;
+}
+
+app.post('/api/rooms', async (req, res) => {
+  const ip = clientIp(req);
+  if (!canCreate(ip)) {
+    return res.status(429).json({ success: false, error: 'Muitos bingos criados agora. Tente de novo daqui a pouco.', code: 'TOO_MANY' });
+  }
+  if (gameState.countOwned() >= MAX_OWNED_ROOMS) {
+    return res.status(503).json({ success: false, error: 'O servidor está cheio de bingos agora. Tente mais tarde.', code: 'FULL' });
+  }
+
+  try {
+    const room = newRoomName();
+    const key = crypto.randomBytes(18).toString('base64url');
+    await gameState.createRoom(room, hashKey(key));
+    createdByIp.get(ip).push(Date.now());
+
+    const base = publicBase(req);
+    // A chave vai depois do #: não chega ao servidor nem aos logs quando o link é aberto
+    const adminUrl = `${base}/admin?sala=${room}#chave=${key}`;
+    const adminQr = await QRCode.toDataURL(adminUrl, { width: 280, margin: 1 });
+    console.log(`Bingo criado: ${room}`);
+    res.status(201).json({
+      success: true,
+      room,
+      key,
+      displayUrl: `${base}/?sala=${room}`,
+      adminUrl,
+      adminQr,
+      ttlHours: ROOM_TTL_MS / 3600000
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Não consegui criar o bingo', code: 'CREATE_ERROR' });
+  }
+});
+
+// Faxina: apaga os bingos parados e o que ficou na memória deles
+async function cleanupRooms() {
+  const removed = await gameState.removeInactive(ROOM_TTL_MS);
+  removed.forEach(name => {
+    lastAnnounceByRoom.delete(name);
+    lastClipByRoom.delete(name);
+    [...lastVariant.keys()].filter(k => k.startsWith(`${name}:`)).forEach(k => lastVariant.delete(k));
+  });
+  const now = Date.now();
+  createdByIp.forEach((times, ip) => { if (!times.some(t => now - t < 60 * 60 * 1000)) createdByIp.delete(ip); });
+  if (removed.length) console.log(`Bingos parados apagados: ${removed.join(', ')}`);
+}
+setInterval(() => cleanupRooms().catch(error => console.error('Erro na faxina:', error)), 60 * 60 * 1000).unref();
+
 // ======================
 // ROTAS PROTEGIDAS (ADMIN)
 // ======================
 
+// O controle confere se a chave (ou usuário e senha) vale para esta sala
+app.get('/api/rooms/:name/check', validateRoomName, roomAuth, (req, res) => {
+  res.json({ success: true, owned: Boolean(gameState.peek(req.params.name)?.keyHash) });
+});
+
 // Sortear número aleatório
-app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, parseTargets, async (req, res) => {
+app.post('/api/rooms/:name/draw', validateRoomName, roomAuth, parseTargets, async (req, res) => {
   const { name } = req.params;
   const room = gameState.get(name);
 
@@ -367,13 +485,13 @@ app.post('/api/rooms/:name/draw', adminAuth, validateRoomName, parseTargets, asy
 });
 
 // Marcar um número escolhido pelo admin (bolinha tirada do globo físico)
-app.post('/api/rooms/:name/mark', adminAuth, validateRoomName, parseTargets, async (req, res) => {
+app.post('/api/rooms/:name/mark', validateRoomName, roomAuth, parseTargets, async (req, res) => {
   const number = parseInt(req.body?.number, 10);
   await markNumber(req.params.name, number, parseRepeat(req.body?.repeat), res, req.targets);
 });
 
 // Desfazer o último número (toque por engano)
-app.post('/api/rooms/:name/undo', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/undo', validateRoomName, roomAuth, async (req, res) => {
   const { name } = req.params;
   const { removed } = await gameState.undo(name);
   if (removed) announce(name, { kind: 'stop' });
@@ -382,7 +500,7 @@ app.post('/api/rooms/:name/undo', adminAuth, validateRoomName, async (req, res) 
 });
 
 // Falar de novo: um número, o último, ou todos os sorteados
-app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, parseTargets, (req, res) => {
+app.post('/api/rooms/:name/announce', validateRoomName, roomAuth, parseTargets, (req, res) => {
   const { name } = req.params;
   const room = gameState.get(name);
   const { mode } = req.body || {};
@@ -425,7 +543,7 @@ app.post('/api/rooms/:name/announce', adminAuth, validateRoomName, parseTargets,
 });
 
 // Gravação de voz do celular: converte e manda todo mundo tocar
-app.post('/api/rooms/:name/clip', adminAuth, validateRoomName,
+app.post('/api/rooms/:name/clip', validateRoomName, roomAuth,
   express.raw({ type: ['audio/*', 'video/*', 'application/octet-stream'], limit: '10mb' }), parseTargets,
   async (req, res) => {
     const { name } = req.params;
@@ -448,7 +566,7 @@ app.post('/api/rooms/:name/clip', adminAuth, validateRoomName,
   });
 
 // Resetar sala (novo jogo)
-app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, parseTargets, async (req, res) => {
+app.post('/api/rooms/:name/reset', validateRoomName, roomAuth, parseTargets, async (req, res) => {
   const { name } = req.params;
 
   try {
@@ -467,7 +585,7 @@ app.post('/api/rooms/:name/reset', adminAuth, validateRoomName, parseTargets, as
 });
 
 // Mostrar todos os números
-app.post('/api/rooms/:name/show-all', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/show-all', validateRoomName, roomAuth, async (req, res) => {
   const { name } = req.params;
 
   try {
@@ -480,7 +598,7 @@ app.post('/api/rooms/:name/show-all', adminAuth, validateRoomName, async (req, r
 });
 
 // Mostrar apenas último número
-app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, async (req, res) => {
+app.post('/api/rooms/:name/show-last', validateRoomName, roomAuth, async (req, res) => {
   const { name } = req.params;
 
   try {
@@ -493,7 +611,7 @@ app.post('/api/rooms/:name/show-last', adminAuth, validateRoomName, async (req, 
 });
 
 // Definir preferência de voz
-app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, parseTargets, async (req, res) => {
+app.post('/api/rooms/:name/voice', validateRoomName, roomAuth, parseTargets, async (req, res) => {
   const { name } = req.params;
   const { voiceName } = req.body;
 
@@ -523,10 +641,7 @@ app.post('/api/rooms/:name/voice', adminAuth, validateRoomName, parseTargets, as
 io.on('connection', (socket) => {
   console.log(`Cliente conectado: ${socket.id}`);
 
-  socket.emit('connected', {
-    socketId: socket.id,
-    rooms: Object.keys(gameState.rooms)
-  });
+  socket.emit('connected', { socketId: socket.id });
 
   // Entrar em uma sala
   socket.on('join-room', ({ roomName, speaker, deviceId, deviceName } = {}) => {
@@ -563,6 +678,10 @@ io.on('connection', (socket) => {
   // Erros de som relatados pelos aparelhos (ajuda a investigar "às vezes não toca")
   socket.on('client-log', ({ message } = {}) => {
     if (typeof message !== 'string') return;
+    const now = Date.now();
+    socket.data.logs = (socket.data.logs || []).filter(t => now - t < 60000);
+    if (socket.data.logs.length >= 30) return; // no máximo 30 por minuto por aparelho
+    socket.data.logs.push(now);
     const who = socket.data.deviceName || socket.id;
     console.log(`[aparelho ${who}] ${message.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200)}`);
   });
@@ -583,6 +702,8 @@ io.on('connection', (socket) => {
 // ======================
 // INICIALIZAÇÃO
 // ======================
+
+cleanupRooms().catch(error => console.error('Erro na faxina:', error));
 
 server.listen(PORT, () => {
   const lan = getLanAddresses()[0];

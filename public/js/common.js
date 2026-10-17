@@ -45,7 +45,7 @@ function letterFor(number) {
 
 function getRoomFromUrl() {
   const room = new URLSearchParams(window.location.search).get('sala');
-  return room && /^[a-zA-Z0-9_]{1,50}$/.test(room) ? room : 'bingo';
+  return room && /^[a-zA-Z0-9_-]{1,50}$/.test(room) ? room : 'bingo';
 }
 
 // Monta a cartela com os 75 números agrupados por letra.

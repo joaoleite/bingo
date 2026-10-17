@@ -128,6 +128,104 @@ test('outro site não consegue abrir o websocket (sem CORS)', async () => {
   assert.equal(response.headers.get('access-control-allow-origin'), null);
 });
 
+// ---------- Bingo público: cada sala com a sua chave ----------
+async function createRoom(url = base) {
+  const response = await fetch(`${url}/api/rooms`, { method: 'POST' });
+  return { status: response.status, data: await response.json() };
+}
+
+const roomPost = (room, route, headers = {}, body = {}) => fetch(`${base}/api/rooms/${room}/${route}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', ...headers },
+  body: JSON.stringify(body)
+});
+
+test('qualquer pessoa cria um bingo e recebe a chave do controle', async () => {
+  const { status, data } = await createRoom();
+  assert.equal(status, 201);
+  assert.match(data.room, /^[a-z]+-[a-z]+-\d{4}$/);
+  assert.ok(data.key.length >= 20);
+  // Por localhost o servidor troca o endereço pelo IP da rede (para o celular abrir); confere o caminho
+  assert.ok(data.adminUrl.endsWith(`/admin?sala=${data.room}#chave=${data.key}`), data.adminUrl);
+  assert.ok(data.displayUrl.endsWith(`/?sala=${data.room}`), data.displayUrl);
+  assert.match(data.adminQr, /^data:image\/png;base64,/);
+
+  const room = await (await fetch(`${base}/api/rooms/${data.room}`)).json();
+  assert.equal(room.exists, true);
+  assert.equal(room.owned, true);
+  assert.equal(JSON.stringify(room).includes(data.key), false, 'devolveu a chave');
+  assert.equal('keyHash' in room, false, 'devolveu o hash da chave');
+});
+
+test('a chave de um bingo só mexe nele, não nos outros', async () => {
+  const a = (await createRoom()).data;
+  const b = (await createRoom()).data;
+  const keyA = { 'X-Bingo-Key': a.key };
+
+  assert.equal((await roomPost(a.room, 'mark', keyA, { number: 7 })).status, 200);
+  assert.equal((await fetch(`${base}/api/rooms/${a.room}/check`, { headers: keyA })).status, 200);
+
+  // Chave de A em B, B sem chave, chave inventada: tudo recusado
+  assert.equal((await roomPost(b.room, 'mark', keyA, { number: 7 })).status, 401);
+  assert.equal((await roomPost(b.room, 'reset', keyA)).status, 401);
+  assert.equal((await roomPost(b.room, 'mark', {}, { number: 7 })).status, 401);
+  assert.equal((await roomPost(b.room, 'mark', { 'X-Bingo-Key': 'x'.repeat(24) }, { number: 7 })).status, 401);
+
+  const roomB = await (await fetch(`${base}/api/rooms/${b.room}`)).json();
+  assert.deepEqual(roomB.drawnNumbers, [], 'B foi alterado');
+  const roomA = await (await fetch(`${base}/api/rooms/${a.room}`)).json();
+  assert.deepEqual(roomA.drawnNumbers, [7]);
+});
+
+test('a sala da família continua só com usuário e senha', async () => {
+  const { data } = await createRoom();
+  assert.equal((await roomPost('bingo', 'mark', { 'X-Bingo-Key': data.key }, { number: 9 })).status, 401);
+  assert.equal((await roomPost('bingo', 'reset', { 'X-Bingo-Key': data.key })).status, 401);
+  // O dono do servidor (senha) entra em qualquer sala, inclusive nas com chave
+  assert.equal((await roomPost(data.room, 'mark', { Authorization: AUTH }, { number: 9 })).status, 200);
+});
+
+test('olhar uma sala que não existe não cria a sala', async () => {
+  const room = await (await fetch(`${base}/api/rooms/ninguem-criou-1234`)).json();
+  assert.equal(room.exists, false);
+  const list = await (await fetch(`${base}/api/rooms`, { headers: { Authorization: AUTH } })).json();
+  assert.equal(list.rooms.some(r => r.name === 'ninguem-criou-1234'), false);
+});
+
+test('a lista de salas exige senha e nunca mostra chaves', async () => {
+  assert.equal((await fetch(`${base}/api/rooms`)).status, 401);
+  const text = await (await fetch(`${base}/api/rooms`, { headers: { Authorization: AUTH } })).text();
+  assert.equal(text.includes('keyHash'), false);
+});
+
+test('nomes de sala como __proto__ não quebram o servidor', async () => {
+  for (const name of ['__proto__', 'constructor', 'hasOwnProperty']) {
+    const response = await fetch(`${base}/api/rooms/${name}`);
+    assert.equal(response.status, 200, name);
+    assert.equal((await response.json()).exists, false, name);
+  }
+  assert.equal((await roomPost('__proto__', 'mark', { Authorization: AUTH }, { number: 1 })).status, 200);
+  assert.equal(({}).drawnNumbers, undefined, 'poluiu Object.prototype');
+});
+
+test('limite de bingos criados por endereço e no total', async () => {
+  const limited = await startServer({ ROOM_CREATE_LIMIT: '2' });
+  try {
+    assert.equal((await createRoom(limited.url)).status, 201);
+    assert.equal((await createRoom(limited.url)).status, 201);
+    assert.equal((await createRoom(limited.url)).status, 429);
+  } finally {
+    limited.proc.kill();
+  }
+  const full = await startServer({ MAX_OWNED_ROOMS: '1' });
+  try {
+    assert.equal((await createRoom(full.url)).status, 201);
+    assert.equal((await createRoom(full.url)).status, 503);
+  } finally {
+    full.proc.kill();
+  }
+});
+
 test('em produção não sobe com senha fraca', async () => {
   const port = await freePort();
   const proc = spawn(process.execPath, ['server.js'], {

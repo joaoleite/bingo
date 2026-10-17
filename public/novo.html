@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Crie um bingo grátis, sem cadastro: telão que fala os números com voz e controle no celular.">
+  <title>Crie o seu bingo</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+</head>
+<body class="novo-page">
+  <main class="novo">
+    <section id="intro" class="novo-card">
+      <img class="novo-logo" src="/icons/icon-192.png" alt="" width="96" height="96">
+      <h1>Crie o seu bingo</h1>
+      <p class="novo-lead">A TV (ou o notebook ligado na caixa de som) vira o telão e fala cada número em voz alta. O seu celular vira o controle.</p>
+      <ul class="novo-list">
+        <li>🎱 75 números com voz em português</li>
+        <li>📱 Controle no celular: sortear, repetir, conferir cartela</li>
+        <li>🎉 "BINGO!" com confete quando alguém ganha</li>
+        <li>🆓 Grátis e sem cadastro. O bingo some depois de 48 horas parado</li>
+      </ul>
+      <button id="btn-create" class="btn btn-primary btn-big" type="button">🎲 Criar meu bingo</button>
+      <p id="create-error" class="error" hidden></p>
+    </section>
+
+    <section id="created" class="novo-card" hidden>
+      <h1>Pronto! 🎉</h1>
+      <p class="novo-lead">Seu bingo: <strong id="room"></strong></p>
+
+      <div class="novo-step">
+        <h2><span class="novo-num">1</span> Telão</h2>
+        <p>Abra na TV ou no notebook ligado à caixa de som e clique em <b>Ativar som</b>.</p>
+        <code id="display-url" class="novo-url"></code>
+        <div class="novo-actions">
+          <a id="open-display" class="btn" target="_blank" rel="noopener">📺 Abrir o telão</a>
+          <button id="share-display" class="btn" type="button">🔗 Enviar link</button>
+        </div>
+      </div>
+
+      <div class="novo-step">
+        <h2><span class="novo-num">2</span> Controle no seu celular</h2>
+        <p>Escaneie com a câmera do celular. É por ele que você sorteia.</p>
+        <img id="admin-qr" class="novo-qr" alt="QR code do controle">
+        <div class="novo-actions">
+          <a id="open-admin" class="btn btn-primary">🎮 Abrir o controle aqui</a>
+          <button id="share-admin" class="btn" type="button">🔗 Enviar link do controle</button>
+        </div>
+        <p class="novo-warn">⚠️ <b>Guarde o link do controle:</b> quem tiver esse link consegue sortear. Ele também fica salvo no controle, em ⚙️ Configurações.</p>
+      </div>
+    </section>
+
+    <p class="novo-foot">Código aberto em <a href="https://github.com/joaoleite/bingo">github.com/joaoleite/bingo</a></p>
+  </main>
+
+  <script src="/js/novo.js"></script>
+</body>
+</html>

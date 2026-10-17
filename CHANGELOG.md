@@ -18,6 +18,17 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.4.0 — 2026-10-17
+Bingo público: qualquer pessoa cria o seu, sem cadastro.
+- Página `/novo` ("Crie o seu bingo"): gera uma sala com nome sorteado (`pipoca-azul-4821`) e uma chave só dela. O anfitrião recebe o link do telão e o link do controle (com QR code).
+- Cada sala aceita só a sua chave (header `X-Bingo-Key`; no link ela vai depois do `#` e o servidor guarda só o hash). Usuário e senha continuam sendo a chave mestra, e o único jeito de entrar na sala da família.
+- Controle: entra direto com a chave guardada; avisa quando o bingo tem dono ou já foi apagado; em Configurações, botões para enviar o link do telão e do controle. O telão mostra o nome da sala.
+- Bingos parados por 48 horas são apagados. Limite de 10 criações por hora por endereço e 500 bingos ao mesmo tempo.
+- Corrigido: a lista de salas (`/api/rooms`) era pública, o estado de todas as salas ia para todos os aparelhos (`room-updated`) e a lista de nomes ia junto ao conectar. Olhar uma sala não cria mais a sala no arquivo.
+- Corrigido: salas chamadas `__proto__` ou `constructor` davam erro 500 (as salas agora ficam num objeto sem protótipo).
+- Log dos aparelhos limitado a 30 mensagens por minuto.
+- 10 testes novos (27 no total), entre eles: a chave de um bingo não mexe em outro nem na sala da família.
+
 ### 4.3.0 — 2026-10-17
 - Bola gigante: botão 🔍 no topo do telão (desligado por padrão, lembrado por aparelho). Cada número novo ocupa a tela por 4 segundos; desfazer não dispara.
 - Socket.IO sem CORS aberto: só o próprio site conecta.

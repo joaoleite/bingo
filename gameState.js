@@ -38,7 +38,8 @@ const mutex = new Mutex();
 
 class GameState {
     constructor() {
-        this.rooms = {};
+        // Sem protótipo: uma sala chamada "__proto__" ou "constructor" vira só mais uma chave
+        this.rooms = Object.create(null);
         this.load();
     }
 
@@ -46,11 +47,11 @@ class GameState {
         try {
             if (fs.existsSync(STATE_FILE)) {
                 const data = fs.readFileSync(STATE_FILE, 'utf8');
-                this.rooms = JSON.parse(data);
+                this.rooms = Object.assign(Object.create(null), JSON.parse(data));
             }
         } catch (error) {
             console.error('Erro ao carregar estado:', error);
-            this.rooms = {};
+            this.rooms = Object.create(null);
         }
     }
 
@@ -70,19 +71,59 @@ class GameState {
         }
     }
 
+    _newRoom() {
+        return {
+            currentNumber: null,
+            drawnNumbers: [],
+            isShowingAll: false,
+            voicePreference: 'default',
+            lastActivity: Date.now()
+        };
+    }
+
     _getRoomState(roomName) {
         if (!roomName) roomName = 'public';
 
         if (!this.rooms[roomName]) {
-            this.rooms[roomName] = {
-                currentNumber: null,
-                drawnNumbers: [],
-                isShowingAll: false,
-                voicePreference: 'default',
-                lastActivity: Date.now()
-            };
+            this.rooms[roomName] = this._newRoom();
         }
         return this.rooms[roomName];
+    }
+
+    // Consulta sem criar: quem só está olhando não pode encher o arquivo de salas
+    peek(roomName) {
+        return Object.hasOwn(this.rooms, roomName) ? this.rooms[roomName] : null;
+    }
+
+    // Sala criada em /novo: tem dono (hash da chave do controle) e expira quando fica parada
+    async createRoom(roomName, keyHash) {
+        const release = await mutex.acquire();
+        try {
+            if (this.peek(roomName)) throw new Error('Sala já existe');
+            this.rooms[roomName] = { ...this._newRoom(), keyHash, createdAt: Date.now() };
+            this.save();
+            return this.rooms[roomName];
+        } finally {
+            release();
+        }
+    }
+
+    countOwned() {
+        return Object.values(this.rooms).filter(room => room.keyHash).length;
+    }
+
+    // Apaga as salas com dono paradas há mais de maxAgeMs; as sem dono (da família) ficam
+    async removeInactive(maxAgeMs, now = Date.now()) {
+        const release = await mutex.acquire();
+        try {
+            const removed = Object.keys(this.rooms)
+                .filter(name => this.rooms[name].keyHash && now - this.rooms[name].lastActivity > maxAgeMs);
+            removed.forEach(name => delete this.rooms[name]);
+            if (removed.length) this.save();
+            return removed;
+        } finally {
+            release();
+        }
     }
 
     async setVoicePreference(roomName, voiceName) {
