@@ -44,6 +44,7 @@ Quem canta usa o celular. O servidor guarda o jogo e avisa todas as telas na hor
 - 🟦 Cartela com os 75 números; os sorteados acendem e o número atual pulsa
 - 🕘 Os últimos 10 números em fichas, para quem se distraiu
 - 🎉 **"BINGO!" com confete** quando o controle avisa "Temos vencedor!"
+- 🔍 **Bola gigante** (botão no topo de cada telão): cada número novo ocupa a tela inteira por 4 segundos, para quando a TV fica longe
 - 🗣️ Fala cada número com voz neural pt-BR ("Letra N. Número 44"), com opção de falar duas vezes
 - 📲 QR code no canto para abrir o controle no celular
 - ⛶ Tela cheia e tela sempre acesa (não apaga no meio do jogo)
@@ -77,6 +78,8 @@ cd bingo
 npm install
 npm start
 ```
+
+(`npm test` roda os testes automáticos; `npm run dev` reinicia o servidor a cada mudança no código.)
 
 1. No notebook ligado à caixa de som, abra **http://localhost:3000**, clique em **Ativar som** e, se quiser, em **Tela cheia**.
 2. No celular, no mesmo Wi-Fi, escaneie o QR code do canto da tela (ou abra o endereço `http://<ip-do-notebook>:3000/admin` que aparece no terminal). Login padrão: `admin` / `admin`.

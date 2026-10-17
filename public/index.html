@@ -17,6 +17,7 @@
       <span id="connection" class="conn disconnected" title="Sem conexão"></span>
       <button id="btn-name" class="btn btn-ghost" type="button" title="Mudar o nome desta caixa de som">📍</button>
       <button id="btn-sound" class="btn btn-ghost" type="button">🔇 Som desligado</button>
+      <button id="btn-big" class="btn btn-ghost" type="button" aria-pressed="false" title="Mostrar cada número novo em tela cheia por alguns segundos">🔍 Bola gigante</button>
       <button id="btn-fullscreen" class="btn btn-ghost" type="button">⛶ Tela cheia</button>
     </div>
   </header>
@@ -39,6 +40,10 @@
       <span id="admin-url"></span>
     </div>
   </aside>
+
+  <div id="big-ball" class="big-ball" hidden>
+    <div id="big-ball-ball" class="ball empty"></div>
+  </div>
 
   <div id="celebration" class="celebration" role="status" hidden>
     <div class="celebration-text" aria-label="Bingo!">

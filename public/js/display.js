@@ -20,7 +20,10 @@ const els = {
   connect: document.getElementById('connect'),
   adminQr: document.getElementById('admin-qr'),
   adminUrl: document.getElementById('admin-url'),
-  celebration: document.getElementById('celebration')
+  celebration: document.getElementById('celebration'),
+  bigBall: document.getElementById('big-ball'),
+  bigBallBall: document.getElementById('big-ball-ball'),
+  btnBig: document.getElementById('btn-big')
 };
 
 const cells = buildBoard(els.board);
@@ -40,6 +43,7 @@ const announcer = new Announcer({
 const WAITING_HTML = '<span class="ball-wait">Aguardando<br>o primeiro<br>número…</span>';
 // undefined até chegar o primeiro estado: abrir a tela não anima a bola
 let shownNumber;
+let shownCount;
 
 function render() {
   const { drawnNumbers, currentNumber } = state;
@@ -49,7 +53,11 @@ function render() {
   if (shownNumber !== undefined && currentNumber && currentNumber !== shownNumber) {
     restartAnimation(els.ball, 'arrive');
   }
+  // Bola gigante só para número novo (desfazer não conta)
+  if (shownCount !== undefined && drawnNumbers.length > shownCount && bigBallOn) showBigBall(currentNumber);
+  if (!currentNumber) hideBigBall();
   shownNumber = currentNumber;
+  shownCount = drawnNumbers.length;
   // Fundo da tela tingido com a cor da letra do número atual
   document.body.dataset.letter = currentNumber ? letterFor(currentNumber) : '';
   updateBoard(cells, drawnNumbers, currentNumber);
@@ -128,6 +136,40 @@ socket.on('announce', event => {
   announcer.handle(event);
 });
 
+// ---------- Bola gigante ----------
+// Para TV longe: cada número novo ocupa a tela por alguns segundos. Ligado ou não, por aparelho.
+const BIG_BALL_MS = 4000;
+let bigBallOn = false;
+let bigBallTimer = null;
+try { bigBallOn = localStorage.getItem('bingo-big-ball') === '1'; } catch (e) { /* ignora */ }
+
+function showBigBall(number) {
+  renderBall(els.bigBallBall, number);
+  els.bigBall.hidden = false;
+  restartAnimation(els.bigBall, 'show');
+  clearTimeout(bigBallTimer);
+  bigBallTimer = setTimeout(hideBigBall, BIG_BALL_MS);
+}
+
+function hideBigBall() {
+  clearTimeout(bigBallTimer);
+  els.bigBall.hidden = true;
+}
+
+function renderBigBallButton() {
+  els.btnBig.setAttribute('aria-pressed', String(bigBallOn));
+  els.btnBig.classList.toggle('btn-on', bigBallOn);
+}
+
+function toggleBigBall() {
+  bigBallOn = !bigBallOn;
+  try { localStorage.setItem('bingo-big-ball', bigBallOn ? '1' : '0'); } catch (e) { /* ignora */ }
+  renderBigBallButton();
+  // Ao ligar, mostra o número atual para a pessoa ver como fica
+  if (bigBallOn && state.currentNumber) showBigBall(state.currentNumber);
+  else hideBigBall();
+}
+
 // ---------- "BINGO!" com confete ----------
 const CONFETTI_COLORS = ['--B', '--I', '--N', '--G', '--O', '--primary'];
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -173,6 +215,8 @@ els.btnNoSound.addEventListener('click', () => { els.overlay.hidden = true; });
 els.btnSound.addEventListener('click', () => (announcer.enabled ? disableSound() : enableSound()));
 els.btnName.addEventListener('click', renameDevice);
 els.celebration.addEventListener('click', endCelebration);
+els.btnBig.addEventListener('click', toggleBigBall);
+els.bigBall.addEventListener('click', hideBigBall);
 els.btnFullscreen.addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.();
@@ -189,5 +233,6 @@ fetch(`/api/info?sala=${room}`)
   .catch(() => {});
 
 renderSoundButton();
+renderBigBallButton();
 renderName();
 els.deviceName.value = getDeviceName();

@@ -276,6 +276,30 @@ body {
 .overlay-emoji { font-size: 4rem; line-height: 1; }
 .overlay-card p { color: var(--text-dim); }
 
+/* Bola gigante: número novo em tela cheia por alguns segundos */
+.btn-on { background: rgba(99, 102, 241, 0.25); border-color: var(--primary); }
+.big-ball {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--tint) 35%, transparent), transparent 70%),
+    rgba(15, 23, 42, 0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.big-ball .ball { --size: min(78vh, 78vw); border-width: calc(var(--size) * 0.025); }
+.big-ball.show .ball {
+  animation:
+    big-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    breathe 2.8s ease-in-out 0.6s infinite;
+}
+@keyframes big-in { from { transform: scale(0.3); opacity: 0; } }
+
 /* "BINGO!" quando o controle avisa que tem vencedor */
 .celebration {
   position: fixed;
@@ -331,6 +355,7 @@ body {
   .display-page .ball:not(.empty),
   .display-page .ball.arrive:not(.empty),
   .display-page .board-cell.current,
+  .big-ball.show .ball,
   .ball-wait,
   .celebration-text span.jump { animation: none; }
   .display-page { transition: none; }

@@ -18,6 +18,12 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.3.0 — 2026-10-17
+- Bola gigante: botão 🔍 no topo do telão (desligado por padrão, lembrado por aparelho). Cada número novo ocupa a tela por 4 segundos; desfazer não dispara.
+- Socket.IO sem CORS aberto: só o próprio site conecta.
+- Testes automáticos (`npm test`, com o executor do próprio Node): estado do jogo, senha, marcar/sortear/desfazer/novo jogo, variações das frases, CORS e a recusa de senha fraca em produção.
+- Guardar os áudios com service worker saiu da lista: o cache com versão da 4.1.0 já resolve.
+
 ### 4.2.0 — 2026-10-17
 Ideias trazidas das versões antigas, para o telão:
 - Bola nova entra rolando e fica pulsando; bola com sombra interna e anel (v1/v2).

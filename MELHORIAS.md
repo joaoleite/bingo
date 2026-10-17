@@ -22,21 +22,19 @@ Esforço: **P** = uma tarde ou menos · **M** = um dia · **G** = mais que isso.
   Quando o controle toca a resposta rápida "🏆 Temos vencedor!" (`public/js/common.js:17`), o telão mostra confete e um "BINGO!" grande além do áudio. A v3 tinha algo parecido no fim do jogo (`v3-bingoplaypwa:src/App.tsx:406-424`).
 - [x] **Mais números recentes** — feito na 4.2.0
   O telão mostra os últimos 6 (`public/js/display.js:46`). Dá para mostrar 10 sem apertar a tela.
-- [ ] **Modo "bola gigante" após o sorteio** — M, opcional
+- [x] **Modo "bola gigante" após o sorteio** — feito na 4.3.0 (botão 🔍 no topo do telão, desligado por padrão)
   A bola ocupa a tela toda por alguns segundos e depois volta para a cartela. Útil quando a TV fica longe. Inspirado no "mostrar último / mostrar todos" da v1 (`v1-bingoplay:server.js:107-126`).
 
 ## Celular / instalação
 
 - [x] **Ícones para instalar na tela inicial** — feito na 4.2.0
   `public/manifest.json` tem `"icons": []` e não há `apple-touch-icon`. Fazer um ícone de bola (192 e 512 px) e declarar nos dois.
-- [ ] **Guardar os áudios no aparelho (service worker)** — M
-  Os ~5,5 MB de MP3 ficariam em cache, e o som sairia mais rápido em Wi-Fi ruim. Não deixa o app offline (o controle depende do servidor). Cuidado para não servir JS antigo depois de um deploy.
 
 ## Código
 
-- [ ] **CORS do Socket.IO aberto (`origin: '*'`)** — P
+- [x] **CORS do Socket.IO aberto (`origin: '*'`)** — feito na 4.3.0
   `server.js:15-20`. Como telão e controle saem do mesmo domínio, dá para remover.
-- [ ] **Testes automáticos do básico** — M
+- [x] **Testes automáticos do básico** — feito na 4.3.0 (`npm test`)
   Sortear, marcar, desfazer, novo jogo e persistência do `gameState.js`. Hoje não há nenhum.
 
 ## Não vale trazer
@@ -48,4 +46,5 @@ Decidido ao comparar as versões, para não voltar a discutir:
 - **App offline / estado no aparelho** (v3) e **sincronização só entre abas** (v2): o servidor com Socket.IO é o que permite vários celulares e caixas de som.
 - **Página para escolher sala** (v1): `?sala=` resolve para uso em família.
 - **Truque do vídeo para manter a tela acesa** (v1): instável no iPad, e o wake lock nativo basta.
+- **Guardar os áudios no aparelho com service worker** (v3): o telão já baixa todos os áudios ao ativar o som, o navegador guarda por 7 dias e a URL muda quando eles mudam (4.1.0). Um service worker repetiria isso e ainda arriscaria servir JS antigo depois de um deploy.
 - **Digitar o número** (v1/v3): o teclado de toque da v4 é mais rápido.

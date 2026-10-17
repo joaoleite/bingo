@@ -12,12 +12,8 @@ const gameState = require('./gameState');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
+// Sem CORS: telão e controle saem deste mesmo servidor, então outro site não precisa conectar
+const io = new Server(server);
 
 // Configuração
 const PORT = process.env.PORT || 3000;
