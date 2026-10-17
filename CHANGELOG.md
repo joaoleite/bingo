@@ -21,6 +21,7 @@ git checkout v3-bingoplaypwa
 ### 4.0.0 — 2026-10-17
 - Repositórios antigos reunidos aqui como tags; autor de todos os commits unificado.
 - Faxina: `node_modules` e `.DS_Store` fora do git, documentação da época da recuperação removida, README reescrito.
+- Repositório público, com licença MIT, README com prints do telão e do controle.
 
 ### 2026-10-11
 - Controle pelo celular com voz, tela da caixa de som e deploy no Coolify.
