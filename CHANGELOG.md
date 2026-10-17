@@ -1,62 +1,32 @@
-# Changelog
+# Histórico
 
-Todas as mudançasnotáveis neste projeto serão documentadas neste arquivo.
+O bingo foi o projeto usado para testar cada nova geração de IA. Cada tentativa era um repositório separado; em outubro de 2026 todos foram reunidos aqui, com o histórico completo de cada um preservado numa tag.
 
-O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
+| Versão | Tag | Repositório de origem | Período | O que era |
+|---|---|---|---|---|
+| v1 | `v1-bingoplay` | `bingoplay` | set–dez/2025 | Node + Express + Socket.IO. Telão com bola animada, controle com senha, voz do navegador (`speechSynthesis`). Funcionava, com bugs no controle |
+| v2 | `v2-bingomaster` | `bingoMaster-v2` | dez/2025 | Protótipo React/Vite gerado no Google AI Studio. Sincronizava só abas do mesmo navegador (`BroadcastChannel`) |
+| v3 | `v3-bingoplaypwa` | `BingoPlayPWA` | abr/2026 | React + Tailwind + PWA offline para iOS, estado no IndexedDB. Nunca chegou a funcionar (tela branca, build quebrado) |
+| v4 | `v4.0.0` | `bingo-familia` | abr–out/2026 | **Atual.** Recuperado do código da v1 e reescrito: áudios neurais pt-BR, controle pelo celular, segure para falar, escolha de caixa de som, modo conferir |
 
-## [1.0.0] - 2026-04-04
+O que nunca foi mesclado também virou tag: as branches da v1 `v1-bingoplay-fix-high-priority-bugs` e `v1-bingoplay-fix-ipad-wake-lock`, e o PR #1 da v3 `v3-bingoplaypwa-pr1`.
 
-### Added (Funcionalidades Adicionadas)
+```bash
+git tag -n                 # lista as versões com a descrição
+git checkout v3-bingoplaypwa
+```
 
-- Estrutura base do projeto com package.json
-- Dependências configuradas:
-  - express (^4.18.2)
-  - socket.io (^4.7.2)
-  - qrcode (^1.5.4)
-  - express-basic-auth (^1.2.1)
-  - nodemon (^3.0.1)
-- Módulo gameState.js com:
-  - Gerenciamento de múltiplas salas
-  - Persistência em arquivo JSON
-  - Métodos: drawNumber, reset, setShowAll, setShowLast
-  - Validação de números duplicados
-- Arquivo game-state.json com 9 salas pré-configuradas:
-  - salaA, salaB, public, QA, QA_Mobile
-  - TesteSala, jt5jf, VisualDebug, VisualVerify
+## v4
 
-### Known Issues (Problemas Conhecidos)
+### 4.0.0 — 2026-10-17
+- Repositórios antigos reunidos aqui como tags; autor de todos os commits unificado.
+- Faxina: `node_modules` e `.DS_Store` fora do git, documentação da época da recuperação removida, README reescrito.
 
-- server.js não existe (arquivo principal faltando)
-- Diretório public/ está vazio (sem frontend)
-- Repositório git corrompido
-- Sem testes automatizados
+### 2026-10-11
+- Controle pelo celular com voz, tela da caixa de som e deploy no Coolify.
+- Segure para falar, respostas rápidas e modo conferir.
+- Escolher em qual caixa de som tocar; botão "Este celular" para tocar no próprio controle.
+- Som do controle independente do websocket; primeiro toque após recarregar não perde o som; revisão para o Safari do iPhone.
 
----
-
-## [0.0.0] - Início do Projeto
-
-### Added
-
-- Criação do projeto "bingo-client-server"
-- Configuração inicial de dependências npm
-
----
-
-## Versões Futuras (Planejadas)
-
-### [1.1.0] - Planned
-- Implementação completa do server.js
-- Frontend web responsivo
-- Sistema de autenticação funcional
-- QR codes dinâmicos
-
-### [1.2.0] - Planned
-- Sistema de cartelas de bingo
-- Validação automática de bingo
-- Anúncios de voz (TTS)
-
-### [2.0.0] - Planned
-- Reescrita do frontend em framework moderno
-- PWA com service worker
-- Chat em tempo real
-- Sistema de ranking
+### 2026-04-04
+- Código da v1 recuperado de uma cópia local com o git corrompido: `server.js` e telas recriados, bugs críticos corrigidos, mutex no estado do jogo.

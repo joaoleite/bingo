@@ -1,5 +1,9 @@
 # 🎱 Bingo
 
+Bingo da família: o notebook ligado à caixa de som (ou à TV) mostra a bola e a cartela e fala cada número com voz neural; o celular vira o controle.
+
+No ar em **https://bingo.jota.qzz.io** (controle em `/admin`).
+
 ## Como usar no dia
 
 1. No notebook ligado à caixa de som: `npm start` e abra **http://localhost:3000**. Clique em **Ativar som** (e em **Tela cheia**, se quiser mostrar na TV).
@@ -10,107 +14,47 @@
 
 O chip no topo do controle mostra quantas caixas de som estão ativas. Se aparecer "nenhuma caixa de som", clique em **Ativar som** na tela do notebook.
 
-Os áudios ficam em `public/audio/` (voz neural pt-BR). Para gerar de novo com outra voz: `scripts/gerar-audios.sh pt-BR-AntonioNeural` (precisa de internet e `uv`).
+Outros recursos do controle: **segure para falar** (grava a sua voz e toca na caixa de som), respostas rápidas ("sim, saiu", "não saiu", "vamos conferir"…), **modo conferir** para checar a cartela de quem gritou bingo e escolha de **em qual caixa de som tocar** quando há mais de uma.
 
-
-Sistema de Bingo em tempo real com servidor Node.js e cliente web.
-
-## Status do Projeto
-
-⚠️ **EM DESENVOLVIMENTO** - O projeto está em estado incompleto.
-
-### Problemas Conhecidos
-
-- [ ] `server.js` está faltando (arquivo principal do servidor)
-- [ ] Diretório `public/` está vazio (sem interface web)
-- [ ] Repositório git corrompido
-- [ ] Sem testes automatizados
-
-## Tecnologias
-
-| Componente | Tecnologia | Versão |
-|------------|------------|--------|
-| Runtime | Node.js | - |
-| Web Framework | Express.js | ^4.18.2 |
-| WebSocket | Socket.IO | ^4.7.2 |
-| QR Code | qrcode | ^1.5.4 |
-| Auth | express-basic-auth | ^1.2.1 |
-| Dev | nodemon | ^3.0.1 |
-
-## Instalação
+## Rodar
 
 ```bash
 npm install
-npm start      # Iniciar servidor
-npm run dev   # Iniciar com hot-reload
+npm start      # http://localhost:3000
+npm run dev    # com hot-reload (nodemon)
 ```
 
-## Estrutura do Projeto
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `PORT` | `3000` | Porta HTTP |
+| `ADMIN_USER` / `ADMIN_PASS` | `admin` / `admin` | Login do controle. Em produção (`NODE_ENV=production`) o app **não sobe** sem `ADMIN_PASS` forte |
+| `PUBLIC_URL` | descobre pelo acesso | Endereço usado no QR code (ex.: `https://bingo.jota.qzz.io`) |
+| `STATE_FILE` | `game-state.json` | Onde o jogo em andamento é salvo |
+
+Salas: tudo funciona por sala; o padrão é `public` e `?sala=<nome>` abre outra.
+
+## Estrutura
 
 ```
-bingoplay/
-├── public/           # Arquivos estáticos do cliente web
-├── game-state.json   # Estado persistido dos jogos
-├── gameState.js      # Módulo de gerenciamento de estado
-├── server.js         # Servidor Express + Socket.IO (FALTANDO)
-└── package.json
+server.js            Express + Socket.IO: sorteio, marcação, voz, gravações, QR
+gameState.js         Estado das salas, salvo em JSON (com mutex)
+public/index.html    Telão / caixa de som        → js/display.js
+public/admin.html    Controle no celular          → js/admin.js
+public/js/common.js  Cartela, bola, tocador de áudio (Announcer)
+public/audio/<voz>/  MP3 de cada número e das respostas rápidas
+scripts/gerar-audios.sh  Gera os áudios de uma voz (edge-tts)
 ```
 
-## Salas Disponíveis
+Vozes disponíveis: `francisca`, `antonio`, `thalita`. Para gerar de novo ou criar outra: `scripts/gerar-audios.sh pt-BR-AntonioNeural` (precisa de internet e `uv`) e cadastre a voz em `VOICES` (`server.js`) e em `public/js/common.js`.
 
-O sistema suporta múltiplas salas simultâneas:
-- `salaA` - Sala de teste A
-- `salaB` - Sala de teste B
-- `public` - Sala pública padrão
-- `QA` - Sala para QA
-- `QA_Mobile` - Sala mobile para QA
-- `TesteSala` - Sala de testes genérica
-- `jt5jf` - Sala com jogo completo (75 números)
-- `VisualDebug` - Sala para debug visual
-- `VisualVerify` - Sala para verificação visual
+## Deploy
 
-## Configuração
+Coolify no VPS, a partir do `Dockerfile` / `docker-compose.yaml`. O jogo fica no volume `/data` e sobrevive a redeploy. `ADMIN_PASS` vem das variáveis de ambiente do Coolify.
 
-### Variáveis de Ambiente
+## Versões anteriores
 
-```env
-PORT=3000                    # Porta do servidor (default: 3000)
-ADMIN_USER=admin             # Usuário admin (default: admin)
-ADMIN_PASS=admin             # Senha admin (default: admin)
-STATE_FILE=game-state.json   # Arquivo de estado (default: game-state.json)
+Este repositório guarda todas as tentativas de bingo, cada uma como tag. Veja [CHANGELOG.md](./CHANGELOG.md) e as ideias pendentes em [MELHORIAS.md](./MELHORIAS.md).
+
+```bash
+git checkout v1-bingoplay   # volta para qualquer versão antiga
 ```
-
-## API REST
-
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| GET | `/api/rooms` | Lista todas as salas |
-| GET | `/api/rooms/:name` | Retorna estado de uma sala |
-| POST | `/api/rooms/:name/draw` | Sorteia um número |
-| POST | `/api/rooms/:name/reset` | Reseta sala |
-| POST | `/api/rooms/:name/show-all` | Mostra todos os números |
-| POST | `/api/rooms/:name/show-last` | Mostra apenas último número |
-
-### WebSocket Events
-
-**Cliente → Servidor:**
-- `join-room` - Entrar em uma sala
-- `draw-number` - Solicitar sorteio
-- `reset-room` - Resetar sala
-
-**Servidor → Cliente:**
-- `number-drawn` - Número foi sorteado
-- `room-updated` - Estado da sala mudou
-- `room-reset` - Sala foi resetada
-
-## Documentação Adicional
-
-- [TODO.md](./TODO.md) - Lista de tarefas
-- [BUGS.md](./BUGS.md) - Bugs conhecidos
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitetura técnica
-- [API.md](./API.md) - Documentação da API
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Guia de contribuição
-
-## Licença
-
-MIT

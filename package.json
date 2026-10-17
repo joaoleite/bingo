@@ -1,7 +1,7 @@
 {
-  "name": "bingo-client-server",
-  "version": "1.0.0",
-  "description": "Sistema de Bingo com servidor e cliente web",
+  "name": "bingo",
+  "version": "4.0.0",
+  "description": "Bingo da família: telão com voz, controle pelo celular e escolha de caixa de som",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -21,6 +21,6 @@
     "websocket",
     "realtime"
   ],
-  "author": "",
+  "author": "João Leite <joaoleite@gmail.com>",
   "license": "MIT"
 }
