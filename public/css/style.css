@@ -98,19 +98,31 @@ body {
   background: radial-gradient(circle at 35% 30%, #fff 0 18%, var(--c, var(--bg-3)) 60%);
   color: #0f172a;
   border: 6px solid var(--c, var(--border));
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  /* Sombra por dentro (volume) + anel translúcido por fora + sombra no chão */
+  box-shadow:
+    inset calc(var(--size) * -0.05) calc(var(--size) * -0.07) calc(var(--size) * 0.14) rgba(0, 0, 0, 0.3),
+    0 0 0 calc(var(--size) * 0.035) rgba(255, 255, 255, 0.1),
+    0 10px 40px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
 }
-.ball.empty { background: var(--bg-2); color: var(--text-dim); }
+.ball.empty {
+  background: var(--bg-2);
+  color: var(--text-dim);
+  box-shadow: 0 0 0 calc(var(--size) * 0.035) rgba(255, 255, 255, 0.04), 0 10px 40px rgba(0, 0, 0, 0.5);
+}
 .ball-letter { font-size: calc(var(--size) * 0.2); font-weight: 800; line-height: 1; }
 .ball-number { font-size: calc(var(--size) * 0.42); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
-.ball.pop { animation: pop 0.6s ease-out; }
-@keyframes pop {
-  0% { transform: scale(0.6); }
-  60% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
 .ball-small { --size: 104px; border-width: 4px; }
+
+/* Antes do primeiro número */
+.ball-wait {
+  font-size: calc(var(--size) * 0.085);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  animation: wait-blink 2s ease-in-out infinite;
+}
+@keyframes wait-blink { 50% { opacity: 0.35; } }
 
 /* ---------- Cartela (75 números) ----------
    DOM: [B, 1..15, I, 16..30, ...]. Na horizontal cada letra é uma linha; na vertical, uma coluna. */
@@ -143,7 +155,49 @@ body {
 /* ============================================
    TELA (caixa de som)
    ============================================ */
-.display-page { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* Cor da letra do número atual, registrada como cor para o fundo mudar suavemente */
+@property --tint {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+.display-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  --tint: transparent;
+  background:
+    radial-gradient(ellipse 60% 90% at 15% 55%, color-mix(in srgb, var(--tint) 32%, transparent), transparent 70%),
+    var(--bg);
+  transition: --tint 0.9s ease;
+}
+.display-page[data-letter="B"] { --tint: var(--B); }
+.display-page[data-letter="I"] { --tint: var(--I); }
+.display-page[data-letter="N"] { --tint: var(--N); }
+.display-page[data-letter="G"] { --tint: var(--G); }
+.display-page[data-letter="O"] { --tint: var(--O); }
+
+/* Bola nova entra rolando; depois fica "respirando" */
+.display-page .ball:not(.empty) { animation: breathe 2.8s ease-in-out infinite; }
+.display-page .ball.arrive:not(.empty) {
+  animation:
+    roll-in 0.9s cubic-bezier(0.34, 1.35, 0.64, 1) both,
+    breathe 2.8s ease-in-out 0.9s infinite;
+}
+@keyframes roll-in {
+  0% { transform: translateX(-160%) rotate(-540deg); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: translateX(0) rotate(0deg); opacity: 1; }
+}
+@keyframes breathe { 50% { transform: scale(1.035); } }
+
+/* Número atual pulsando e maior na cartela */
+.display-page .board-cell.current { z-index: 1; animation: current-pulse 1.6s ease-in-out infinite; }
+@keyframes current-pulse {
+  0%, 100% { transform: scale(1.06); box-shadow: 0 0 0 3px #fde047, 0 0 10px rgba(253, 224, 71, 0.4); }
+  50% { transform: scale(1.18); box-shadow: 0 0 0 4px #fde047, 0 0 28px rgba(253, 224, 71, 0.85); }
+}
 
 .topbar {
   display: flex;
@@ -222,9 +276,75 @@ body {
 .overlay-emoji { font-size: 4rem; line-height: 1; }
 .overlay-card p { color: var(--text-dim); }
 
+/* "BINGO!" quando o controle avisa que tem vencedor */
+.celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(15, 23, 42, 0.85);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+  cursor: pointer;
+  animation: fade-in 0.3s ease-out;
+}
+@keyframes fade-in { from { opacity: 0; } }
+.celebration-text { font-size: clamp(5rem, 19vw, 17rem); font-weight: 900; line-height: 1; white-space: nowrap; }
+.celebration-text span {
+  display: inline-block;
+  color: var(--c, #fde047);
+  text-shadow: 0 0.06em 0 rgba(0, 0, 0, 0.35), 0 0 0.4em color-mix(in srgb, var(--c, #fde047) 60%, transparent);
+}
+.celebration-text span.jump {
+  animation:
+    letter-jump 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--i) * 90ms) both,
+    letter-bob 1.4s ease-in-out calc(0.9s + var(--i) * 120ms) infinite;
+}
+@keyframes letter-jump {
+  0% { transform: translateY(60vh) scale(0.4) rotate(-20deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes letter-bob { 50% { transform: translateY(-0.08em) rotate(3deg); } }
+.celebration-sub { font-size: clamp(1.5rem, 4vw, 3rem); font-weight: 800; text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); }
+.confetti {
+  position: absolute;
+  top: -5vh;
+  width: var(--w);
+  height: calc(var(--w) * 0.45);
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fall var(--dur) linear var(--delay) both;
+}
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(var(--drift), 112vh) rotate(var(--spin)); opacity: 0; }
+}
+
+/* Quem pediu menos movimento no sistema vê tudo parado */
+@media (prefers-reduced-motion: reduce) {
+  .display-page .ball:not(.empty),
+  .display-page .ball.arrive:not(.empty),
+  .display-page .board-cell.current,
+  .ball-wait,
+  .celebration-text span.jump { animation: none; }
+  .display-page { transition: none; }
+}
+
 /* Tela em pé (celular/tablet): letras viram colunas */
 @media (max-width: 900px), (orientation: portrait) {
-  .display-page { height: auto; overflow: auto; }
+  .display-page {
+    height: auto;
+    overflow: auto;
+    background:
+      radial-gradient(ellipse 90% 45% at 50% 22%, color-mix(in srgb, var(--tint) 32%, transparent), transparent 70%),
+      var(--bg);
+  }
   .display-main { flex-direction: column; align-items: stretch; }
   .now-panel .ball { --size: min(55vw, 40vh); }
   .recent { max-width: none; }

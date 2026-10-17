@@ -18,6 +18,17 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.2.0 — 2026-10-17
+Ideias trazidas das versões antigas, para o telão:
+- Bola nova entra rolando e fica pulsando; bola com sombra interna e anel (v1/v2).
+- Fundo da tela com a cor da letra do número atual (v2).
+- Número atual pulsando e maior na cartela (v2).
+- "Aguardando o primeiro número…" piscando antes de começar (v1).
+- "BINGO!" com confete quando o controle toca "Temos vencedor!", em todas as telas da sala (v3).
+- Últimos 10 números em vez de 6.
+- Ícone para instalar na tela inicial do celular (iPhone e Android).
+- Tudo parado para quem ativou "reduzir movimento" no sistema.
+
 ### 4.1.0 — 2026-10-17
 - Respostas rápidas com 4 variações cada; o servidor sorteia sem repetir a anterior, e todas as caixas falam a mesma. O modo conferir também varia o "já saiu / não saiu".
 - Voz mais rápida: os áudios das três vozes foram gerados de novo na velocidade natural (antes `-12%`).

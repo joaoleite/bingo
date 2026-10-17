@@ -87,12 +87,21 @@ function updateBoard(cells, drawnNumbers, currentNumber) {
   });
 }
 
-function renderBall(el, number) {
+// Troca só as classes da letra, sem apagar uma animação que esteja rodando na bola
+function renderBall(el, number, emptyHtml = '<span class="ball-number">–</span>') {
   const letter = number ? letterFor(number) : '';
-  el.className = `ball ${el.classList.contains('ball-small') ? 'ball-small' : ''} ${letter ? `l-${letter}` : 'empty'}`;
+  COLUMNS.forEach(col => el.classList.toggle(`l-${col.letter}`, col.letter === letter));
+  el.classList.toggle('empty', !letter);
   el.innerHTML = number
     ? `<span class="ball-letter">${letter}</span><span class="ball-number">${number}</span>`
-    : '<span class="ball-number">–</span>';
+    : emptyHtml;
+}
+
+// Recomeça uma animação CSS mesmo que a classe já esteja no elemento
+function restartAnimation(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
 }
 
 function setConnection(el, connected) {

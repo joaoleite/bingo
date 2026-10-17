@@ -39,9 +39,11 @@ Quem canta usa o celular. O servidor guarda o jogo e avisa todas as telas na hor
 ## O que dá para fazer
 
 **No telão**
-- 🎱 Bola grande com o último número, colorida pela letra (B azul, I vermelho, N branco, G verde, O laranja)
-- 🟦 Cartela com os 75 números; os sorteados acendem e o número atual fica destacado
-- 🕘 Os últimos números em fichas, para quem se distraiu
+- 🎱 Bola grande com o último número, colorida pela letra (B azul, I vermelho, N branco, G verde, O laranja). Cada número novo entra rolando, e a bola fica pulsando
+- 🎨 O fundo da tela ganha a cor da letra do número atual, para reconhecer de longe
+- 🟦 Cartela com os 75 números; os sorteados acendem e o número atual pulsa
+- 🕘 Os últimos 10 números em fichas, para quem se distraiu
+- 🎉 **"BINGO!" com confete** quando o controle avisa "Temos vencedor!"
 - 🗣️ Fala cada número com voz neural pt-BR ("Letra N. Número 44"), com opção de falar duas vezes
 - 📲 QR code no canto para abrir o controle no celular
 - ⛶ Tela cheia e tela sempre acesa (não apaga no meio do jogo)
@@ -55,10 +57,14 @@ Quem canta usa o celular. O servidor guarda o jogo e avisa todas as telas na hor
 - 🔎 **Modo conferir**: quando alguém grita bingo, toque nos números da cartela dele para ver se já saíram, sem marcar nada
 - 🔊 **Escolher a caixa de som**: tocar em todas, só em uma, ou no próprio celular
 - ⚙️ Três vozes (Francisca, Antonio, Thalita), novo jogo e opções
+- 📲 Instala na tela inicial do celular, com ícone próprio (no iPhone: Compartilhar → Adicionar à Tela de Início)
+
+<p align="center"><img src="docs/bingo.png" alt="Telão com BINGO! em letras coloridas e confete caindo" width="80%"></p>
 
 **Por trás**
 - 💾 O jogo é salvo em disco: reiniciar o servidor ou recarregar a página não perde os números
 - 🔒 Controle protegido por senha; em produção o app nem sobe sem senha forte
+- 🧘 Quem ativou "reduzir movimento" no sistema vê o telão sem animações
 - 🏠 Salas: `?sala=nome` abre outro jogo independente no mesmo servidor
 
 ## Começar em 2 minutos

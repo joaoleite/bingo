@@ -19,7 +19,8 @@ const els = {
   deviceName: document.getElementById('device-name'),
   connect: document.getElementById('connect'),
   adminQr: document.getElementById('admin-qr'),
-  adminUrl: document.getElementById('admin-url')
+  adminUrl: document.getElementById('admin-url'),
+  celebration: document.getElementById('celebration')
 };
 
 const cells = buildBoard(els.board);
@@ -36,14 +37,25 @@ const announcer = new Announcer({
   onLog: message => socket.emit('client-log', { message })
 });
 
+const WAITING_HTML = '<span class="ball-wait">Aguardando<br>o primeiro<br>número…</span>';
+// undefined até chegar o primeiro estado: abrir a tela não anima a bola
+let shownNumber;
+
 function render() {
   const { drawnNumbers, currentNumber } = state;
   els.drawnCount.textContent = drawnNumbers.length;
-  renderBall(els.ball, currentNumber);
+  renderBall(els.ball, currentNumber, WAITING_HTML);
+  // Anima quando o número muda na tela, com ou sem som nesta caixa
+  if (shownNumber !== undefined && currentNumber && currentNumber !== shownNumber) {
+    restartAnimation(els.ball, 'arrive');
+  }
+  shownNumber = currentNumber;
+  // Fundo da tela tingido com a cor da letra do número atual
+  document.body.dataset.letter = currentNumber ? letterFor(currentNumber) : '';
   updateBoard(cells, drawnNumbers, currentNumber);
 
   els.recent.innerHTML = '';
-  drawnNumbers.slice(0, -1).slice(-6).reverse().forEach(n => {
+  drawnNumbers.slice(0, -1).slice(-10).reverse().forEach(n => {
     const chip = document.createElement('span');
     chip.className = `chip l-${letterFor(n)}`;
     chip.textContent = `${letterFor(n)} ${n}`;
@@ -111,19 +123,56 @@ socket.on('room-state', data => {
 
 socket.on('announce', event => {
   if (event.room !== room) return;
-  if (event.kind === 'number' && announcer.isForMe(event)) {
-    els.ball.classList.remove('pop');
-    void els.ball.offsetWidth; // reinicia a animação
-    els.ball.classList.add('pop');
-  }
+  // A festa é só visual: aparece em todas as telas da sala, mesmo as que não vão falar
+  if (event.kind === 'phrase' && event.phrase === 'vencedor') celebrate(event.id);
   announcer.handle(event);
 });
+
+// ---------- "BINGO!" com confete ----------
+const CONFETTI_COLORS = ['--B', '--I', '--N', '--G', '--O', '--primary'];
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let celebrationTimer = null;
+let celebratedId = null;
+
+function celebrate(id) {
+  if (id && id === celebratedId) return; // mesmo anúncio recebido de novo
+  celebratedId = id;
+  clearTimeout(celebrationTimer);
+  els.celebration.querySelectorAll('.confetti').forEach(piece => piece.remove());
+  if (!reduceMotion.matches) {
+    for (let i = 0; i < 140; i++) {
+      const piece = document.createElement('span');
+      piece.className = 'confetti';
+      const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      piece.style.cssText = [
+        `left: ${Math.random() * 100}%`,
+        `background: var(${color})`,
+        `--w: ${8 + Math.random() * 10}px`,
+        `--drift: ${(Math.random() - 0.5) * 30}vw`,
+        `--spin: ${(Math.random() - 0.5) * 1440}deg`,
+        `--dur: ${2.8 + Math.random() * 2.4}s`,
+        `--delay: ${Math.random() * 1.2}s`
+      ].join(';');
+      els.celebration.appendChild(piece);
+    }
+  }
+  els.celebration.hidden = false;
+  els.celebration.querySelectorAll('.celebration-text span').forEach(letter => restartAnimation(letter, 'jump'));
+  celebrationTimer = setTimeout(endCelebration, 7000);
+}
+
+function endCelebration() {
+  clearTimeout(celebrationTimer);
+  els.celebration.hidden = true;
+  els.celebration.querySelectorAll('.confetti').forEach(piece => piece.remove());
+}
 
 // ---------- Botões ----------
 els.btnEnableSound.addEventListener('click', enableSound);
 els.btnNoSound.addEventListener('click', () => { els.overlay.hidden = true; });
 els.btnSound.addEventListener('click', () => (announcer.enabled ? disableSound() : enableSound()));
 els.btnName.addEventListener('click', renameDevice);
+els.celebration.addEventListener('click', endCelebration);
 els.btnFullscreen.addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.();
