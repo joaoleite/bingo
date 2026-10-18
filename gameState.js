@@ -112,12 +112,12 @@ class GameState {
         return Object.values(this.rooms).filter(room => room.keyHash).length;
     }
 
-    // Apaga as salas com dono paradas há mais de maxAgeMs; as sem dono (da família) ficam
+    // Apaga as salas paradas há mais de maxAgeMs
     async removeInactive(maxAgeMs, now = Date.now()) {
         const release = await mutex.acquire();
         try {
             const removed = Object.keys(this.rooms)
-                .filter(name => this.rooms[name].keyHash && now - this.rooms[name].lastActivity > maxAgeMs);
+                .filter(name => now - (this.rooms[name].lastActivity || 0) > maxAgeMs);
             removed.forEach(name => delete this.rooms[name]);
             if (removed.length) this.save();
             return removed;

@@ -232,7 +232,7 @@ fetch(`/api/info?sala=${room}`)
   })
   .catch(() => {});
 
-// Bingo criado em /novo: mostra o nome da sala para quem está jogando
+// Mostra o nome do bingo para quem está jogando
 if (room !== 'bingo') {
   const roomName = document.getElementById('room-name');
   roomName.textContent = room;

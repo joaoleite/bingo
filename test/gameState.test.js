@@ -80,22 +80,27 @@ test('bingo criado guarda o hash da chave e não pode ser criado duas vezes', as
   await assert.rejects(gameState.createRoom('pipoca-azul-0001', 'b'.repeat(64)), /já existe/);
 });
 
-test('faxina apaga só os bingos com dono parados há muito tempo', async () => {
+test('faxina apaga os bingos parados há muito tempo, com ou sem dono', async () => {
   const now = Date.now();
   const hours = h => h * 60 * 60 * 1000;
   await gameState.createRoom('velho-azul-0002', 'c'.repeat(64));
   await gameState.createRoom('novo-azul-0003', 'd'.repeat(64));
   await gameState.drawNumber('familia_antiga', 5);
+  await gameState.drawNumber('familia_hoje', 8);
   gameState.peek('velho-azul-0002').lastActivity = now - hours(49);
   gameState.peek('novo-azul-0003').lastActivity = now - hours(1);
   gameState.peek('familia_antiga').lastActivity = now - hours(500);
+  gameState.peek('familia_hoje').lastActivity = now - hours(2);
 
   const removed = await gameState.removeInactive(hours(48), now);
-  assert.deepEqual(removed, ['velho-azul-0002']);
+  assert.deepEqual(removed.sort(), ['familia_antiga', 'velho-azul-0002']);
   assert.equal(gameState.peek('velho-azul-0002'), null);
+  assert.equal(gameState.peek('familia_antiga'), null);
   assert.ok(gameState.peek('novo-azul-0003'));
-  assert.ok(gameState.peek('familia_antiga'), 'apagou sala sem dono');
-  assert.equal('velho-azul-0002' in JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')), false);
+  assert.ok(gameState.peek('familia_hoje'));
+  const saved = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  assert.equal('velho-azul-0002' in saved, false);
+  assert.equal('familia_antiga' in saved, false);
 });
 
 test('dois toques ao mesmo tempo no mesmo número marcam uma vez só', async () => {

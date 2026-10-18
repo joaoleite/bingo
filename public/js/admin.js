@@ -4,7 +4,7 @@
 
 const room = getRoomFromUrl();
 const CREDENTIALS_KEY = 'bingo-admin';
-// Chave do controle de um bingo criado em /novo (uma por sala, guardada neste aparelho)
+// Chave do controle do bingo (uma por sala, guardada neste aparelho)
 const ROOM_KEY_STORE = `bingo-key:${room}`;
 const PREFS_KEY = 'bingo-admin-prefs';
 
@@ -47,7 +47,7 @@ const els = {
   toast: document.getElementById('toast')
 };
 
-let credentials = null; // { key } (bingo criado em /novo) ou { user, pass } (dono do servidor)
+let credentials = null; // { key } (link do controle) ou { user, pass } (dono do servidor)
 let socket = null;
 let state = { drawnNumbers: [], currentNumber: null };
 let speakerCount = 0;

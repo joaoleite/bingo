@@ -35,7 +35,7 @@ const VOICES = ['francisca', 'antonio', 'thalita'];
 // Respostas rápidas: id -> quantas variações (public/audio/<voz>/<id>.mp3, <id>-2.mp3, ...)
 const PHRASES = { 'sim-saiu': 4, 'nao-saiu': 4, conferir: 4, vencedor: 4, aguarde: 4 };
 const lastVariant = new Map(); // "sala:frase" -> última variação tocada
-// Bingos criados em /novo: somem depois de ROOM_TTL_HOURS parados; limites contra abuso
+// Bingos somem depois de ROOM_TTL_HOURS parados; limites contra abuso na criação
 const ROOM_TTL_MS = (Number(process.env.ROOM_TTL_HOURS) || 48) * 60 * 60 * 1000;
 const ROOM_CREATE_LIMIT = Number(process.env.ROOM_CREATE_LIMIT) || 10; // por endereço, por hora
 const MAX_OWNED_ROOMS = Number(process.env.MAX_OWNED_ROOMS) || 500;
@@ -93,9 +93,15 @@ function sendPage(name, file) {
     res.type('html').send(PAGES ? PAGES[name] : renderPage(file));
   };
 }
-app.get(['/', '/index.html'], sendPage('display', 'index.html'));
-app.get(['/admin', '/admin.html'], sendPage('admin', 'admin.html'));
-app.get(['/novo', '/novo.html'], sendPage('novo', 'novo.html'));
+// A página inicial é a de criar bingo; com ?sala= vira o telão daquele bingo
+const sendDisplay = sendPage('display', 'index.html');
+const sendNovo = sendPage('novo', 'novo.html');
+const hasRoom = req => ROOM_REGEX.test(req.query.sala || '');
+app.get(['/', '/index.html'], (req, res) => (hasRoom(req) ? sendDisplay : sendNovo)(req, res));
+// Controle sem sala não tem o que controlar: volta para criar um bingo
+app.get(['/admin', '/admin.html'], (req, res, next) => (hasRoom(req) ? next() : res.redirect('/')), sendPage('admin', 'admin.html'));
+// Endereço antigo da página de criar (link do README e do GitHub)
+app.get(['/novo', '/novo.html'], (req, res) => res.redirect(301, '/'));
 
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -121,7 +127,7 @@ const validateRoomName = (req, res, next) => {
   next();
 };
 
-// Chave do controle de um bingo criado em /novo: guardamos só o hash
+// Chave do controle de cada bingo: guardamos só o hash
 function hashKey(key) {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
@@ -324,7 +330,7 @@ function publicBase(req) {
 app.get('/api/info', async (req, res) => {
   const room = ROOM_REGEX.test(req.query.sala || '') ? req.query.sala : 'bingo';
   const base = publicBase(req);
-  const suffix = room === 'bingo' ? '' : `?sala=${room}`;
+  const suffix = `?sala=${room}`;
   const adminUrl = `${base}/admin${suffix}`;
 
   try {
@@ -710,8 +716,8 @@ server.listen(PORT, () => {
   const base = PUBLIC_URL || (lan ? `http://${lan}:${PORT}` : `http://localhost:${PORT}`);
   console.log(`
 🎱 BINGO SERVER INICIADO
-  Tela (caixa de som): ${PUBLIC_URL || `http://localhost:${PORT}`}
-  Controle (celular):  ${base}/admin
+  Crie um bingo:  ${PUBLIC_URL || `http://localhost:${PORT}`}
+  Pelo celular:   ${base}
   Admin: ${ADMIN_USER} / ${IS_PRODUCTION ? '(senha em ADMIN_PASS)' : ADMIN_PASS}
   `);
 });

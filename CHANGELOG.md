@@ -18,6 +18,11 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.5.0 — 2026-10-18
+- A página de criar bingo agora é a tela inicial (`/`). O telão de cada bingo continua em `/?sala=<nome>`; `/novo` redireciona para `/`, e `/admin` sem sala também.
+- Sem sala padrão: a sala sem `?sala=` (a da família) saiu. A faxina de 48 horas parado vale para todos os bingos, com ou sem chave.
+- Rodapé da tela inicial virou "Contribua no GitHub", com estrela, ideia ou bug e fork.
+
 ### 4.4.0 — 2026-10-17
 Bingo público: qualquer pessoa cria o seu, sem cadastro.
 - Página `/novo` ("Crie o seu bingo"): gera uma sala com nome sorteado (`pipoca-azul-4821`) e uma chave só dela. O anfitrião recebe o link do telão e o link do controle (com QR code).

@@ -60,10 +60,24 @@ test('health responde', async () => {
 });
 
 test('telão sai com a versão dos arquivos e dos áudios', async () => {
-  const html = await (await fetch(base)).text();
+  const html = await (await fetch(`${base}/?sala=bingo`)).text();
   assert.match(html, /<meta name="bingo-version" content="[0-9a-f]{10}">/);
   assert.match(html, /<meta name="bingo-audio" content="[0-9a-f]{10}">/);
   assert.match(html, /\/js\/display\.js\?v=[0-9a-f]{10}/);
+});
+
+test('a página inicial é a de criar bingo; com sala, é o telão', async () => {
+  assert.match(await (await fetch(base)).text(), /\/js\/novo\.js/);
+  assert.match(await (await fetch(`${base}/?sala=pipoca-azul-0001`)).text(), /\/js\/display\.js/);
+
+  const old = await fetch(`${base}/novo`, { redirect: 'manual' });
+  assert.equal(old.status, 301);
+  assert.equal(old.headers.get('location'), '/');
+
+  const semSala = await fetch(`${base}/admin`, { redirect: 'manual' });
+  assert.equal(semSala.status, 302);
+  assert.equal(semSala.headers.get('location'), '/');
+  assert.match(await (await fetch(`${base}/admin?sala=pipoca-azul-0001`)).text(), /\/js\/admin\.js/);
 });
 
 test('controle exige senha', async () => {

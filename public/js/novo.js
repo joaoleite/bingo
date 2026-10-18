@@ -1,5 +1,5 @@
 // ============================================
-// CRIAR BINGO - página pública (/novo)
+// CRIAR BINGO - página inicial (/)
 // ============================================
 
 const $ = id => document.getElementById(id);

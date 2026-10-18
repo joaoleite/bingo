@@ -643,5 +643,10 @@ body {
 .novo-actions .btn { flex: 1 1 200px; }
 .novo-qr { align-self: center; width: 220px; height: 220px; border-radius: 12px; background: #fff; padding: 8px; }
 .novo-warn { font-size: 0.9rem; background: rgba(217, 119, 6, 0.12); border-radius: 10px; padding: 0.6rem 0.8rem; }
-.novo-foot { text-align: center; color: var(--text-dim); font-size: 0.85rem; }
-.novo-foot a { color: #c7d2fe; }
+.novo-gh { gap: 0.8rem; padding: 1.5rem; }
+.novo-gh h2 { display: flex; align-items: center; justify-content: center; gap: 0.6rem; font-size: 1.3rem; }
+.novo-gh p { color: var(--text-dim); text-align: center; }
+.novo-gh-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.novo-gh-actions .btn { flex: 1 1 auto; font-size: 0.95rem; white-space: nowrap; }
+.novo-gh-foot { font-size: 0.85rem; }
+.novo-gh a:not(.btn) { color: #c7d2fe; }

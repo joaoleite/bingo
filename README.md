@@ -11,7 +11,7 @@ Cada número sorteado aparece grande na TV e é falado em voz alta, com voz neur
 ![Idioma](https://img.shields.io/badge/idioma-pt--BR-009c3b)
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
 
-### [🎲 Crie o seu bingo agora →](https://bingo.jota.qzz.io/novo)
+### [🎲 Crie o seu bingo agora →](https://bingo.jota.qzz.io)
 Grátis, sem cadastro e sem instalar nada.
 
 </div>
@@ -67,15 +67,15 @@ Quem canta usa o celular. O servidor guarda o jogo e avisa todas as telas na hor
 
 **Por trás**
 - 💾 O jogo é salvo em disco: reiniciar o servidor ou recarregar a página não perde os números
-- 🔒 Controle protegido por senha; em produção o app nem sobe sem senha forte
+- 🔒 Cada bingo tem a sua chave: só quem tem o link do controle sorteia
 - 🧘 Quem ativou "reduzir movimento" no sistema vê o telão sem animações
-- 🏠 Salas: cada bingo é um jogo independente no mesmo servidor, com o seu telão, o seu controle e as suas caixas de som
+- 🏠 Cada bingo é um jogo independente no mesmo servidor, com o seu telão, o seu controle e as suas caixas de som; o que fica 48 horas parado é apagado
 
 ## Crie o seu bingo (sem instalar nada)
 
 <img src="docs/novo.png" alt="Página Crie o seu bingo" width="260" align="right">
 
-Abra **[bingo.jota.qzz.io/novo](https://bingo.jota.qzz.io/novo)** e toque em **Criar meu bingo**. Você recebe:
+Abra **[bingo.jota.qzz.io](https://bingo.jota.qzz.io)** e toque em **Criar meu bingo**. Você recebe:
 
 1. **O link do telão**, para abrir na TV ou no notebook ligado à caixa de som. Pode mostrar para todo mundo.
 2. **O link do controle**, com um QR code para abrir no seu celular. É ele que sorteia: só quem tem esse link manda no bingo. Ele fica salvo no celular e em ⚙️ Configurações do controle, de onde dá para enviar para outra pessoa ajudar.
@@ -97,9 +97,9 @@ npm start
 
 (`npm test` roda os testes automáticos; `npm run dev` reinicia o servidor a cada mudança no código.)
 
-1. No notebook ligado à caixa de som, abra **http://localhost:3000**, clique em **Ativar som** e, se quiser, em **Tela cheia**.
-2. No celular, no mesmo Wi-Fi, escaneie o QR code do canto da tela (ou abra o endereço `http://<ip-do-notebook>:3000/admin` que aparece no terminal). Login padrão: `admin` / `admin`.
-3. Toque em **🎲 Sortear número** ou no número que saiu do globo. Pronto.
+1. No notebook ligado à caixa de som, abra **http://localhost:3000** e toque em **Criar meu bingo**.
+2. Clique em **Abrir o telão**, depois em **Ativar som** e, se quiser, em **Tela cheia**.
+3. No celular, no mesmo Wi-Fi, escaneie o QR code do controle (ele já aponta para o IP do notebook na rede) e toque em **🎲 Sortear número** ou no número que saiu do globo. Pronto.
 
 O chip no topo do controle mostra quantas caixas de som estão ativas. Se aparecer "nenhuma caixa de som", clique em **Ativar som** na tela do notebook.
 
@@ -112,14 +112,14 @@ O chip no topo do controle mostra quantas caixas de som estão ativas. Se aparec
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `PORT` | `3000` | Porta HTTP |
-| `ADMIN_USER` / `ADMIN_PASS` | `admin` / `admin` | Login do controle. Com `NODE_ENV=production`, o app **não sobe** se a senha for `admin` ou tiver menos de 8 caracteres |
+| `ADMIN_USER` / `ADMIN_PASS` | `admin` / `admin` | Chave mestra do dono do servidor. Com `NODE_ENV=production`, o app **não sobe** se a senha for `admin` ou tiver menos de 8 caracteres |
 | `PUBLIC_URL` | descobre pelo acesso | Endereço usado no QR code, ex.: `https://bingo.seudominio.com` |
 | `STATE_FILE` | `game-state.json` | Onde o jogo em andamento é salvo |
-| `ROOM_TTL_HOURS` | `48` | Bingos criados em `/novo` são apagados depois desse tempo parados |
+| `ROOM_TTL_HOURS` | `48` | Bingos são apagados depois desse tempo parados |
 | `ROOM_CREATE_LIMIT` | `10` | Quantos bingos o mesmo endereço pode criar por hora |
-| `MAX_OWNED_ROOMS` | `500` | Máximo de bingos criados em `/novo` ao mesmo tempo |
+| `MAX_OWNED_ROOMS` | `500` | Máximo de bingos ao mesmo tempo |
 
-**Quem manda em cada sala:** um bingo criado em `/novo` aceita a chave dele (que vem no link do controle, depois do `#`, e fica guardada só como hash no servidor). Usuário e senha do `ADMIN_USER`/`ADMIN_PASS` são a chave mestra: entram em qualquer sala, e são o único jeito de entrar na sala padrão (`/` e `/admin`, sem `?sala=`).
+**Quem manda em cada bingo:** cada um aceita a sua chave, que vem no link do controle depois do `#` e fica guardada só como hash no servidor. Usuário e senha do `ADMIN_USER`/`ADMIN_PASS` são a chave mestra: entram em qualquer bingo (`/admin?sala=<nome>`).
 
 ## Publicar com Docker
 
@@ -139,9 +139,9 @@ O volume `/data` guarda o jogo e faz ele sobreviver a atualizações. O `docker-
 ```
 server.js              Express + Socket.IO: sorteio, marcação, voz, gravações, QR
 gameState.js           Estado das salas, salvo em JSON (com mutex)
-public/index.html      Telão / caixa de som        → js/display.js
-public/admin.html      Controle no celular          → js/admin.js
-public/novo.html       Página pública "Crie o seu bingo" → js/novo.js
+public/novo.html       Página inicial "Crie o seu bingo" (/)  → js/novo.js
+public/index.html      Telão / caixa de som (/?sala=)         → js/display.js
+public/admin.html      Controle no celular (/admin?sala=)     → js/admin.js
 public/js/common.js    Cartela, bola, tocador de áudio
 public/audio/<voz>/    MP3 de cada número e das respostas rápidas
 scripts/gerar-audios.sh  Gera os áudios de uma voz
@@ -166,6 +166,10 @@ git checkout main           # e volta para a versão atual
 ```
 
 Detalhes em [CHANGELOG.md](./CHANGELOG.md). Ideias para as próximas versões em [MELHORIAS.md](./MELHORIAS.md).
+
+## Contribua
+
+Achou um bug, pensou numa resposta rápida engraçada ou quer uma voz nova? [Abra uma issue](https://github.com/joaoleite/bingo/issues/new) ou mande um pull request: `npm test` precisa passar. Se o bingo animou a sua festa, deixe uma ⭐.
 
 ## Licença
 
