@@ -11,6 +11,9 @@ services:
       ADMIN_USER: '${ADMIN_USER:-admin}'
       ADMIN_PASS: '${ADMIN_PASS}'
       PUBLIC_URL: '${PUBLIC_URL:-https://bingo.jota.qzz.io}'
+      # Medição de uso: só a chave phc_ liga; outro valor (ou vazio) deixa desligada
+      POSTHOG_KEY: '${POSTHOG_KEY:-}'
+      POSTHOG_HOST: '${POSTHOG_HOST:-https://us.i.posthog.com}'
     volumes:
       # Volume nomeado: o jogo em andamento sobrevive a redeploy
       - dados-bingo:/data

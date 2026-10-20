@@ -80,6 +80,27 @@ test('a página inicial é a de criar bingo; com sala, é o telão', async () =>
   assert.match(await (await fetch(`${base}/admin?sala=pipoca-azul-0001`)).text(), /\/js\/admin\.js/);
 });
 
+test('medição de uso só liga com a chave pública do PostHog (phc_)', async () => {
+  assert.doesNotMatch(await (await fetch(base)).text(), /posthog|medicao\.js/, 'sem POSTHOG_KEY carregou o PostHog');
+
+  for (const [key, liga] of [['phc_teste123', true], ['phx_secreta123', false], ['COLE_AQUI_A_CHAVE_phc', false]]) {
+    const { proc, url } = await startServer({ POSTHOG_KEY: key });
+    try {
+      for (const page of ['/', '/?sala=pipoca-azul-0001', '/admin?sala=pipoca-azul-0001']) {
+        const html = await (await fetch(url + page)).text();
+        if (liga) {
+          assert.match(html, /<meta name="posthog" content="phc_teste123" data-host="https:\/\/us\.i\.posthog\.com"/, page);
+          assert.match(html, /\/js\/medicao\.js\?v=[0-9a-f]{10}/, page);
+        } else {
+          assert.doesNotMatch(html, new RegExp(`${key}|medicao\\.js`), `${key} foi para ${page}`);
+        }
+      }
+    } finally {
+      proc.kill();
+    }
+  }
+});
+
 test('controle exige senha', async () => {
   assert.equal((await fetch(`${base}/api/admin/check`)).status, 401);
   const semSenha = await fetch(`${base}/api/rooms/bingo/mark`, {

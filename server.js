@@ -22,6 +22,11 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || (IS_PRODUCTION ? '' : 'admin');
 // Endereço público (ex.: https://bingo.jota.qzz.io); vazio = descobre pelo acesso
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+// Medição de uso (PostHog). Só a chave pública do projeto (phc_) liga: a pessoal (phx_) e a
+// secreta (phs_) iriam parar no HTML de todo mundo
+const POSTHOG_KEY = /^phc_\w+$/.test((process.env.POSTHOG_KEY || '').trim()) ? process.env.POSTHOG_KEY.trim() : '';
+const POSTHOG_HOST = (process.env.POSTHOG_HOST || 'https://us.i.posthog.com').replace(/\/$/, '');
+if (process.env.POSTHOG_KEY && !POSTHOG_KEY) console.warn('Medição desligada: POSTHOG_KEY não começa com phc_ (é a Project API key)');
 
 // Em produção o site é público: sem senha forte, não sobe (falha fechada)
 if (IS_PRODUCTION && (!ADMIN_PASS || ADMIN_PASS === 'admin' || ADMIN_PASS.length < 8)) {
@@ -78,19 +83,26 @@ function audioVersion() {
 }
 const AUDIO_VERSION = audioVersion();
 
-function renderPage(file) {
+// Sem POSTHOG_KEY, a página não carrega nada do PostHog
+function medicaoTags(name) {
+  if (!POSTHOG_KEY) return '';
+  return `\n  <meta name="posthog" content="${POSTHOG_KEY}" data-host="${POSTHOG_HOST}" data-pagina="${name}">` +
+    `\n  <script src="/js/medicao.js?v=${ASSET_VERSION}"></script>`;
+}
+
+function renderPage(file, name) {
   return fs.readFileSync(path.join(__dirname, 'public', file), 'utf8')
     .replace(/(src|href)="\/(js|css)\/([^"?]+)"/g, `$1="/$2/$3?v=${ASSET_VERSION}"`)
-    .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">\n  <meta name="bingo-audio" content="${AUDIO_VERSION}">`);
+    .replace('<head>', `<head>\n  <meta name="bingo-version" content="${ASSET_VERSION}">\n  <meta name="bingo-audio" content="${AUDIO_VERSION}">${medicaoTags(name)}`);
 }
 const PAGES = IS_PRODUCTION
-  ? { display: renderPage('index.html'), admin: renderPage('admin.html'), novo: renderPage('novo.html') }
+  ? { display: renderPage('index.html', 'display'), admin: renderPage('admin.html', 'admin'), novo: renderPage('novo.html', 'novo') }
   : null;
 
 function sendPage(name, file) {
   return (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.type('html').send(PAGES ? PAGES[name] : renderPage(file));
+    res.type('html').send(PAGES ? PAGES[name] : renderPage(file, name));
   };
 }
 // A página inicial é a de criar bingo; com ?sala= vira o telão daquele bingo

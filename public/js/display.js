@@ -100,7 +100,9 @@ async function enableSound() {
     socket.emit('speaker', { on: true, deviceName: getDeviceName() });
     els.overlay.hidden = true;
     keepScreenOn();
+    window.medir?.('som ativado');
   } catch (e) {
+    window.medir?.('som bloqueado');
     alert('O navegador bloqueou o som. Clique de novo em "Ativar som".');
   }
   renderSoundButton();
@@ -165,6 +167,7 @@ function toggleBigBall() {
   bigBallOn = !bigBallOn;
   try { localStorage.setItem('bingo-big-ball', bigBallOn ? '1' : '0'); } catch (e) { /* ignora */ }
   renderBigBallButton();
+  window.medir?.('bola gigante', { ligada: bigBallOn });
   // Ao ligar, mostra o número atual para a pessoa ver como fica
   if (bigBallOn && state.currentNumber) showBigBall(state.currentNumber);
   else hideBigBall();
@@ -211,7 +214,10 @@ function endCelebration() {
 
 // ---------- Botões ----------
 els.btnEnableSound.addEventListener('click', enableSound);
-els.btnNoSound.addEventListener('click', () => { els.overlay.hidden = true; });
+els.btnNoSound.addEventListener('click', () => {
+  els.overlay.hidden = true;
+  window.medir?.('telão sem som');
+});
 els.btnSound.addEventListener('click', () => (announcer.enabled ? disableSound() : enableSound()));
 els.btnName.addEventListener('click', renameDevice);
 els.celebration.addEventListener('click', endCelebration);
@@ -219,7 +225,10 @@ els.btnBig.addEventListener('click', toggleBigBall);
 els.bigBall.addEventListener('click', hideBigBall);
 els.btnFullscreen.addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen?.();
+  else {
+    document.documentElement.requestFullscreen?.();
+    window.medir?.('tela cheia');
+  }
 });
 
 // Endereço + QR code para abrir o controle no celular

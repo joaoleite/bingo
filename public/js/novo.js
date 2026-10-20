@@ -5,10 +5,11 @@
 const $ = id => document.getElementById(id);
 
 // Celular abre o menu de compartilhar (WhatsApp etc.); no computador, copia
-async function shareLink(button, url, title) {
+async function shareLink(button, url, title, link) {
   if (navigator.share) {
     try {
       await navigator.share({ title, url });
+      window.medir?.('link enviado', { link, jeito: 'compartilhar' });
       return;
     } catch (e) {
       if (e.name === 'AbortError') return;
@@ -21,6 +22,7 @@ async function shareLink(button, url, title) {
   } catch (e) {
     window.prompt('Copie o link:', url);
   }
+  window.medir?.('link enviado', { link, jeito: 'copiar' });
   setTimeout(() => { button.textContent = label; }, 2000);
 }
 
@@ -41,12 +43,14 @@ $('btn-create').addEventListener('click', async () => {
     $('open-display').href = data.displayUrl;
     $('open-admin').href = data.adminUrl;
     $('admin-qr').src = data.adminQr;
-    $('share-display').onclick = e => shareLink(e.currentTarget, data.displayUrl, 'Telão do bingo');
-    $('share-admin').onclick = e => shareLink(e.currentTarget, data.adminUrl, 'Controle do bingo');
+    $('share-display').onclick = e => shareLink(e.currentTarget, data.displayUrl, 'Telão do bingo', 'telão');
+    $('share-admin').onclick = e => shareLink(e.currentTarget, data.adminUrl, 'Controle do bingo', 'controle');
     $('intro').hidden = true;
     $('created').hidden = false;
     window.scrollTo(0, 0);
+    window.medir?.('bingo criado');
   } catch (error) {
+    window.medir?.('erro ao criar bingo', { erro: error.message });
     $('create-error').textContent = error.message === 'Failed to fetch' ? 'Sem conexão com o servidor' : error.message;
     $('create-error').hidden = false;
     button.disabled = false;

@@ -105,6 +105,22 @@ function authHeaders(creds) {
   return creds.key ? { 'X-Bingo-Key': creds.key } : { Authorization: authHeader(creds.user, creds.pass) };
 }
 
+// Medição de uso (public/js/medicao.js): o nome da ação e opções do código, nunca a sala
+const EVENTOS = { draw: 'número sorteado', mark: 'número sorteado', undo: 'número desfeito', reset: 'novo jogo', clip: 'fala gravada', voice: 'voz trocada' };
+const ANUNCIOS = { all: 'todos os números falados', stop: 'fala parada', phrase: 'resposta rápida', check: 'número conferido', 'last-clip': 'fala repetida' };
+function medirAcao(action, body, data, targets) {
+  const evento = action === 'announce' ? ANUNCIOS[body.mode] || 'número repetido' : EVENTOS[action];
+  if (!evento) return;
+  window.medir?.(evento, {
+    jeito: action === 'draw' ? 'sorteio' : action === 'mark' ? 'globo' : undefined,
+    frase: body.phrase,
+    voz: body.voiceName,
+    saiu: data.drawn,
+    sorteados: data.totalDrawn ?? state.drawnNumbers.length,
+    caixas: targets ? targets.length : 'todas'
+  });
+}
+
 // body pode ser objeto (vai como JSON) ou Blob (gravação de áudio)
 async function api(action, body = {}) {
   const isBlob = body instanceof Blob;
@@ -130,6 +146,7 @@ async function api(action, body = {}) {
     throw new Error(usedKey ? 'Este bingo não existe mais' : 'Sessão expirada, entre de novo');
   }
   if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao falar com o servidor');
+  medirAcao(action, isBlob ? {} : body, data, targets);
   playHere(data.announce, 'resposta');
   return data;
 }
@@ -511,6 +528,8 @@ async function checkAccess(creds) {
 }
 
 function showController() {
+  if (!credentials.key) window.medir?.operador();
+  window.medir?.('controle aberto', { entrada: credentials.key ? 'chave' : 'senha' });
   els.login.hidden = true;
   els.controller.hidden = false;
   // Bingo com chave: links para compartilhar; "Sair" não faz sentido (a chave é o acesso)
@@ -536,10 +555,11 @@ function showLoginNotes(info) {
 }
 
 // Celular abre o menu de compartilhar (WhatsApp etc.); no computador, copia
-async function shareLink(url, title) {
+async function shareLink(url, title, link) {
   if (navigator.share) {
     try {
       await navigator.share({ title, url });
+      window.medir?.('link enviado', { link, jeito: 'compartilhar' });
       return;
     } catch (e) {
       if (e.name === 'AbortError') return;
@@ -551,11 +571,12 @@ async function shareLink(url, title) {
   } catch (e) {
     toast(url);
   }
+  window.medir?.('link enviado', { link, jeito: 'copiar' });
 }
 
-els.btnShareDisplay.addEventListener('click', () => shareLink(`${location.origin}/?sala=${room}`, 'Telão do bingo'));
+els.btnShareDisplay.addEventListener('click', () => shareLink(`${location.origin}/?sala=${room}`, 'Telão do bingo', 'telão'));
 els.btnShareAdmin.addEventListener('click', () => {
-  if (credentials?.key) shareLink(`${location.origin}/admin?sala=${room}#chave=${credentials.key}`, 'Controle do bingo');
+  if (credentials?.key) shareLink(`${location.origin}/admin?sala=${room}#chave=${credentials.key}`, 'Controle do bingo', 'controle');
 });
 
 els.login.addEventListener('submit', async event => {

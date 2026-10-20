@@ -18,6 +18,13 @@ git checkout v3-bingoplaypwa
 
 ## v4
 
+### 4.6.0 — 2026-10-20
+Medição de uso com o PostHog, ligada pela variável `POSTHOG_KEY` (sem ela, nada carrega).
+- Página inicial, telão e controle contam visitas, cliques, mapa de calor e erros. Eventos próprios: bingo criado, link enviado, controle aberto, número sorteado (pelo sorteio ou pelo globo), desfeito, conferido, resposta rápida (inclusive "Temos vencedor!"), fala gravada, novo jogo, voz trocada, som ativado, bola gigante, tela cheia.
+- Gravação de sessão na página inicial e no controle; o telão não grava.
+- O nome da sala e a chave do controle nunca saem: viram `*` em eventos, URLs, cliques, rede e gravação, e cada página vira um caminho fixo (`/`, `/telao`, `/controle`), com os `utm_` da busca.
+- Quem entra no controle com usuário e senha fica marcado como `operador`, para o filtro de usuários internos.
+
 ### 4.5.0 — 2026-10-18
 - A página de criar bingo agora é a tela inicial (`/`). O telão de cada bingo continua em `/?sala=<nome>`; `/novo` redireciona para `/`, e `/admin` sem sala também.
 - Sem sala padrão: a sala sem `?sala=` (a da família) saiu. A faxina de 48 horas parado vale para todos os bingos, com ou sem chave.

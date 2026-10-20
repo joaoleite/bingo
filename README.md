@@ -118,6 +118,10 @@ O chip no topo do controle mostra quantas caixas de som estão ativas. Se aparec
 | `ROOM_TTL_HOURS` | `48` | Bingos são apagados depois desse tempo parados |
 | `ROOM_CREATE_LIMIT` | `10` | Quantos bingos o mesmo endereço pode criar por hora |
 | `MAX_OWNED_ROOMS` | `500` | Máximo de bingos ao mesmo tempo |
+| `POSTHOG_KEY` | vazio (desligado) | Medição de uso no [PostHog](https://posthog.com): a *Project API key*, que começa com `phc_`. Outra chave é recusada e a medição fica desligada |
+| `POSTHOG_HOST` | `https://us.i.posthog.com` | Região do projeto no PostHog (EU: `https://eu.i.posthog.com`) |
+
+**Medição de uso:** com `POSTHOG_KEY`, as páginas contam visitas, cliques e ações (bingo criado, número sorteado, resposta rápida…) e gravam as sessões da página inicial e do controle; o telão não é gravado. O nome da sala e a chave do controle nunca saem: `public/js/medicao.js` troca os dois por `*` em todo evento, URL e gravação, e cada página vira um caminho fixo (`/`, `/telao`, `/controle`).
 
 **Quem manda em cada bingo:** cada um aceita a sua chave, que vem no link do controle depois do `#` e fica guardada só como hash no servidor. Usuário e senha do `ADMIN_USER`/`ADMIN_PASS` são a chave mestra: entram em qualquer bingo (`/admin?sala=<nome>`).
 
@@ -143,6 +147,7 @@ public/novo.html       Página inicial "Crie o seu bingo" (/)  → js/novo.js
 public/index.html      Telão / caixa de som (/?sala=)         → js/display.js
 public/admin.html      Controle no celular (/admin?sala=)     → js/admin.js
 public/js/common.js    Cartela, bola, tocador de áudio
+public/js/medicao.js   Medição de uso (PostHog), só com POSTHOG_KEY
 public/audio/<voz>/    MP3 de cada número e das respostas rápidas
 scripts/gerar-audios.sh  Gera os áudios de uma voz
 ```
